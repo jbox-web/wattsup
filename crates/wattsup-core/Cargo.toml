@@ -1,0 +1,19 @@
+[package]
+name = "wattsup-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+toml.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+test-support.workspace = true
+tempfile.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"

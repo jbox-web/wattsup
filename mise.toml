@@ -1,0 +1,52 @@
+min_version = "2026.10.2"
+
+[tools]
+# clippy and rustfmt are what dev:lint and dev:fmt-check run; both Apple targets are what
+# apple/package.sh needs to build a universal app (Apple Silicon and Intel).
+rust = { version = "1.92.0", components = "clippy,rustfmt", targets = "aarch64-apple-darwin,x86_64-apple-darwin" }
+
+[tasks."dev:build"]
+description = "Build every crate"
+run = "cargo build --workspace"
+timeout = "600s"
+
+[tasks."dev:test"]
+description = "Run the Rust tests"
+run = "cargo test --workspace"
+timeout = "600s"
+
+[tasks."dev:lint"]
+description = "Clippy, warnings are errors"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+timeout = "600s"
+
+[tasks."dev:fmt-check"]
+description = "Check formatting"
+run = "cargo fmt --all --check"
+timeout = "120s"
+
+[tasks."dev:bindings"]
+description = "Build the Rust library and generate the Swift bindings"
+run = "apple/build-bindings.sh"
+timeout = "900s"
+
+[tasks."dev:swift-test"]
+description = "Run the Swift tests of the app"
+run = "swift test --package-path apple"
+timeout = "900s"
+
+[tasks."dev:package"]
+description = "Build apple/dist/Watt's Up.app and its archive; signs and notarizes when apple/signing.env says so"
+run = "apple/package.sh"
+# Two hours: the build takes minutes, but Apple's notary service has been seen taking more
+# than twenty minutes on a first submission, and a timeout here leaves the app unstapled.
+timeout = "7200s"
+
+[tasks."dev:install"]
+description = "Quit the running app and copy the built one to /Applications"
+run = """
+osascript -e 'tell application id "fr.nicoladmin.wattsup" to quit' 2>/dev/null || true
+rm -rf "/Applications/Watt's Up.app"
+ditto "apple/dist/Watt's Up.app" "/Applications/Watt's Up.app"
+"""
+timeout = "60s"

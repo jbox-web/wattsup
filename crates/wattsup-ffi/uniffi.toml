@@ -1,0 +1,5 @@
+[bindings.swift]
+# Swift module of the generated bindings; the app imports it.
+module_name = "WattsUpCore"
+ffi_module_name = "WattsUpCoreFFI"
+ffi_module_filename = "WattsUpCoreFFI"

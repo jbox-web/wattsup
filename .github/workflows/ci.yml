@@ -1,0 +1,131 @@
+---
+# Every job goes through the mise tasks of mise.toml, so that CI and a developer's
+# machine run the same commands with the same toolchain.
+name: CI
+
+# No token permission by default; no job here needs one.
+permissions: {}
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - "**.md"
+  # Weekly, to catch what breaks without a commit: a new macOS runner image, a new Xcode.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+
+      - name: Check formatting
+        run: mise dev:fmt-check
+
+  # On macOS: the power-source and Keychain code only compiles there, and clippy must see it.
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run clippy
+        run: mise dev:lint
+
+  # The core, the CLI and the fake NUT server are portable: Linux keeps them so.
+  test_linux_amd64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run the Rust tests
+        run: mise dev:test
+
+  test_macos_arm64:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run the Rust tests
+        run: mise dev:test
+
+  # The whole path to the app: bindings, Swift tests, then the bundle itself. Building the
+  # bundle here keeps apple/package.sh from breaking unnoticed until someone needs it.
+  app:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build the Swift bindings
+        run: mise dev:bindings
+
+      - name: Run the Swift tests
+        run: mise dev:swift-test
+
+      - name: Build the app bundle
+        run: mise dev:package
+
+      - name: Verify the bundle's signature
+        run: codesign --verify --strict "apple/dist/Watt's Up.app"

@@ -1,0 +1,6 @@
+target/
+apple/Generated/
+apple/.build/
+apple/dist/
+.superpowers/
+apple/signing.env

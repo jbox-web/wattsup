@@ -1,0 +1,20 @@
+[package]
+name = "wattsup-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+# Swift links the static library; the cdylib is read by uniffi-bindgen.
+crate-type = ["lib", "staticlib", "cdylib"]
+name = "wattsup_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
+[dependencies]
+wattsup-core.workspace = true
+thiserror.workspace = true
+uniffi = { version = "0.32", features = ["cli"] }

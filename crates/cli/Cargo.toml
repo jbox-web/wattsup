@@ -1,0 +1,22 @@
+[package]
+name = "wattsup-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "wattsup"
+path = "src/main.rs"
+
+[dependencies]
+wattsup-core.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework.workspace = true
+
+[dev-dependencies]
+test-support.workspace = true
+tempfile.workspace = true
