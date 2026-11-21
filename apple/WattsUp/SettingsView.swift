@@ -93,9 +93,9 @@ private struct AboutView: View {
 private struct GeneralSettings: View {
     @ObservedObject var model: Model
     @AppStorage(Preferences.notificationsKey) private var notifications = true
-    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var interval = 30
-    @State private var error: String?
+    @SwiftUI.State private var openAtLogin = SMAppService.mainApp.status == .enabled
+    @SwiftUI.State private var interval = 30
+    @SwiftUI.State private var error: String?
 
     var body: some View {
         Form {
@@ -143,9 +143,9 @@ private struct GeneralSettings: View {
 
 private struct UpsSettings: View {
     @ObservedObject var model: Model
-    @State private var editing: Editing?
-    @State private var removing: UpsEntry?
-    @State private var error: String?
+    @SwiftUI.State private var editing: Editing?
+    @SwiftUI.State private var removing: UpsEntry?
+    @SwiftUI.State private var error: String?
 
     /// The UPS being added (nil) or edited.
     private struct Editing: Identifiable {
@@ -220,18 +220,18 @@ private struct UpsEditor: View {
     let original: UpsEntry?
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
-    @State private var host = ""
-    @State private var port = "3493"
-    @State private var ups = ""
-    @State private var username = ""
-    @State private var password = ""
-    @State private var publish = true
-    @State private var notifyUnreachable = true
-    @State private var offered: [UpsName] = []
-    @State private var testing = false
-    @State private var message: String?
-    @State private var failed = false
+    @SwiftUI.State private var name = ""
+    @SwiftUI.State private var host = ""
+    @SwiftUI.State private var port = "3493"
+    @SwiftUI.State private var ups = ""
+    @SwiftUI.State private var username = ""
+    @SwiftUI.State private var password = ""
+    @SwiftUI.State private var publish = true
+    @SwiftUI.State private var notifyUnreachable = true
+    @SwiftUI.State private var offered: [UpsName] = []
+    @SwiftUI.State private var testing = false
+    @SwiftUI.State private var message: String?
+    @SwiftUI.State private var failed = false
 
     private var entry: UpsEntry? {
         guard let port = UInt16(port.trimmingCharacters(in: .whitespaces)), port > 0 else { return nil }

@@ -87,7 +87,7 @@ final class MainWindowController {
 struct MainView: View {
     @ObservedObject var model: Model
     let openSettings: () -> Void
-    @State private var selection: String?
+    @SwiftUI.State private var selection: String?
 
     private var selected: UpsRow? {
         model.rows.first { $0.id == selection } ?? model.rows.first
@@ -145,7 +145,7 @@ private struct UpsCell: View {
 
 private struct DetailView: View {
     let row: UpsRow
-    @State private var filter = ""
+    @SwiftUI.State private var filter = ""
 
     var body: some View {
         let summary = summary(for: row)
