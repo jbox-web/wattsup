@@ -42,6 +42,12 @@ run = "apple/package.sh"
 # than twenty minutes on a first submission, and a timeout here leaves the app unstapled.
 timeout = "7200s"
 
+[tasks."dev:release"]
+description = "Publish the version of Cargo.toml: signed tag, GitHub Release, cask in jbox-web/homebrew-tap"
+run = "apple/release.sh"
+# Includes a notarized build: same budget as dev:package.
+timeout = "7200s"
+
 [tasks."dev:install"]
 description = "Quit the running app and copy the built one to /Applications"
 run = """

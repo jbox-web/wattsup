@@ -32,6 +32,7 @@ mise run dev:bindings    # Rust library + Swift bindings; needed before any swif
 mise run dev:swift-test  # app tests
 mise run dev:package     # apple/dist/Watt's Up.app and its zip; signed and notarized per apple/signing.env
 mise run dev:install     # copies it to /Applications
+mise run dev:release     # tag, GitHub Release, cask in jbox-web/homebrew-tap (apple/release.sh)
 ```
 
 Run `dev:bindings` again after any change to the public surface of `wattsup-ffi`: until

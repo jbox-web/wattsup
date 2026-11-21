@@ -12,7 +12,18 @@ A typical setup is a UPS plugged into a NAS that runs the NUT server; this app t
 that server over TCP (port 3493). A UPS plugged into the Mac by USB is not its business:
 macOS already shows those.
 
-## Build and install
+## Install
+
+```sh
+brew install --cask jbox-web/tap/wattsup
+```
+
+Or download `WattsUp-<version>.zip` from the
+[Releases](https://github.com/jbox-web/wattsup/releases), unzip it and move
+`Watt's Up.app` to `/Applications`. The app is universal (Apple Silicon and Intel),
+needs macOS 14 or later, and is signed and notarized by Apple.
+
+## Build from source
 
 Needs Rust, Xcode with its command-line tools, and [mise](https://mise.jdx.dev/).
 
@@ -38,6 +49,11 @@ and the ticket is stapled to it. `apple/dist/WattsUp-<version>.zip` is the archi
 publish. Apple's answer can take more than twenty minutes. A stable identity also keeps
 the notification permission, the login item and Keychain access from one build to the
 next; an ad hoc one changes with every build.
+
+`mise run dev:release` publishes the version of `Cargo.toml`: it builds, signs and
+notarizes the app, pushes a signed tag, creates the GitHub Release with the archive, and
+writes the `wattsup` cask into [jbox-web/homebrew-tap](https://github.com/jbox-web/homebrew-tap).
+The commit must be pushed first. `apple/release.sh --cask` redoes the last step alone.
 
 Other tasks: `dev:test` and `dev:swift-test` (tests), `dev:lint`, `dev:fmt-check`,
 `dev:bindings` (Rust library and Swift bindings only).
