@@ -8,7 +8,7 @@ func menuSummary(for rows: [UpsRow]) -> String {
     let polled = rows.filter { $0.snapshot != nil }
     if polled.isEmpty { return "…" }
     // The labels of `stateLabel`, in the order of gravity; "out of reach" (nil) comes last.
-    let order: [State?] = [.lowBattery, .onBattery, .noData, .unreachable, .onMains, nil]
+    let order: [State?] = [.lowBattery, .onBattery, .refused, .noData, .unreachable, .onMains, nil]
     return order.compactMap { state in
         let matching = polled.filter { $0.displayed == state }
         return matching.first.map { "\(matching.count) \(stateLabel(for: $0))" }
@@ -21,7 +21,7 @@ func dotColor(for row: UpsRow) -> NSColor {
     switch row.displayed {
     case .onMains: return .systemGreen
     case .onBattery: return .systemOrange
-    case .lowBattery, .unreachable, .noData: return .systemRed
+    case .lowBattery, .unreachable, .noData, .refused: return .systemRed
     case nil: return .tertiaryLabelColor
     }
 }

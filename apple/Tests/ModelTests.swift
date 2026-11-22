@@ -87,6 +87,15 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.menuLook, .attention)
     }
 
+    func testARefusalShowsAsUnreachableInTheMenuBar() async throws {
+        let model = try model([entry("Maison")])
+        poller.set("Maison", snapshot(.refused, error: "the server refused the request (ACCESS-DENIED)"))
+        await model.pollOnce("Maison")
+        XCTAssertEqual(model.rows[0].displayed, .refused)
+        XCTAssertEqual(model.menuLook, .unreachable)
+        XCTAssertNil(published.last?.1)
+    }
+
     func testAllOnMainsIsAllGood() async throws {
         let model = try model([entry("Maison"), entry("Bureau")])
         poller.set("Maison", snapshot(.onMains))

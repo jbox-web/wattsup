@@ -18,6 +18,7 @@ func notificationText(for event: Event, entry: UpsEntry, snapshot: Snapshot?) ->
     case .unreachable: body = tr("Unreachable")
     case .reachableAgain: body = tr("Reachable again")
     case .noData: body = tr("The server has no fresh data from the UPS")
+    case .refused: body = tr("The server refuses the request")
     case .replaceBattery: body = tr("Battery needs replacing")
     }
     return NotificationText(title: entry.name, body: body)
@@ -27,7 +28,7 @@ func notificationText(for event: Event, entry: UpsEntry, snapshot: Snapshot?) ->
 func shouldNotify(_ event: Event, entry: UpsEntry, enabled: Bool) -> Bool {
     guard enabled else { return false }
     switch event {
-    case .unreachable, .reachableAgain, .noData: return entry.notifyUnreachable
+    case .unreachable, .reachableAgain, .noData, .refused: return entry.notifyUnreachable
     case .onBattery, .lowBattery, .backOnMains, .replaceBattery: return true
     }
 }

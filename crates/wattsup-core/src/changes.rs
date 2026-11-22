@@ -10,6 +10,7 @@ pub enum Event {
     Unreachable,
     ReachableAgain,
     NoData,
+    Refused,
     ReplaceBattery,
 }
 
@@ -21,7 +22,7 @@ pub const UNREACHABLE_AFTER: u32 = 3;
 pub struct Tracker {
     /// The last power state seen: on mains, on battery or low battery.
     power: Option<State>,
-    /// `Unreachable` or `NoData`, once declared.
+    /// `Unreachable`, `NoData` or `Refused`, once declared.
     outage: Option<State>,
     failures: u32,
     replace_battery: bool,
@@ -39,7 +40,7 @@ impl Tracker {
     /// network path or has just woken up: a failure then says nothing about the site.
     /// The first poll never raises an event.
     pub fn observe(&mut self, snapshot: &Snapshot, mac_online: bool) -> Vec<Event> {
-        let failed = matches!(snapshot.state, State::Unreachable | State::NoData);
+        let failed = matches!(snapshot.state, State::Unreachable | State::NoData | State::Refused);
         if failed && snapshot.state == State::Unreachable && !mac_online {
             self.out_of_reach = true;
             return Vec::new();
@@ -55,7 +56,11 @@ impl Tracker {
                 self.outage = Some(snapshot.state);
             } else if self.failures >= UNREACHABLE_AFTER {
                 self.outage = Some(snapshot.state);
-                let event = if snapshot.state == State::NoData { Event::NoData } else { Event::Unreachable };
+                let event = match snapshot.state {
+                    State::NoData => Event::NoData,
+                    State::Refused => Event::Refused,
+                    _ => Event::Unreachable,
+                };
                 return vec![event];
             }
             return Vec::new();
@@ -115,6 +120,10 @@ mod tests {
 
     fn unreachable() -> Snapshot {
         Snapshot::from_error(&ClientError::Unreachable("no answer within the timeout".into()))
+    }
+
+    fn refused() -> Snapshot {
+        Snapshot::from_error(&ClientError::Server("ACCESS-DENIED".into()))
     }
 
     fn no_data() -> Snapshot {
@@ -209,6 +218,24 @@ mod tests {
         tracker.observe(&unreachable(), false);
         assert_eq!(tracker.observe(&status("OL"), true), vec![]);
         assert_eq!(tracker.displayed(), Some(State::OnMains));
+    }
+
+    #[test]
+    fn declares_a_refusal_once_at_the_third_poll() {
+        let mut tracker = Tracker::new();
+        let events = run(&mut tracker, &[status("OL"), refused(), refused(), refused(), refused()]);
+        assert_eq!(events, vec![vec![], vec![], vec![], vec![Event::Refused], vec![]]);
+        assert_eq!(tracker.displayed(), Some(State::Refused));
+        assert_eq!(tracker.observe(&status("OL"), true), vec![Event::ReachableAgain]);
+    }
+
+    #[test]
+    fn a_refusal_while_the_mac_is_offline_still_counts() {
+        // A refusal is an answer from the server: the Mac's network is not in question.
+        let mut tracker = Tracker::new();
+        tracker.observe(&status("OL"), true);
+        let events: Vec<_> = (0..3).map(|_| tracker.observe(&refused(), false)).collect();
+        assert_eq!(events[2], vec![Event::Refused]);
     }
 
     #[test]

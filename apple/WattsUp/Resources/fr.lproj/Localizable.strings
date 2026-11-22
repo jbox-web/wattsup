@@ -83,3 +83,5 @@
 "MIT License" = "Licence MIT";
 "Free software: use, change and share it under the MIT license." = "Logiciel libre : utilisez-le, modifiez-le et partagez-le selon la licence MIT.";
 "Source code on GitHub" = "Code source sur GitHub";
+"refused by the server" = "refusé par le serveur";
+"The server refuses the request" = "Le serveur refuse la demande";

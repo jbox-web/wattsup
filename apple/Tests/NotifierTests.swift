@@ -20,6 +20,7 @@ final class NotifierTests: XCTestCase {
         XCTAssertEqual(text(.unreachable, "en").body, "Unreachable")
         XCTAssertEqual(text(.reachableAgain, "en").body, "Reachable again")
         XCTAssertEqual(text(.noData, "en").body, "The server has no fresh data from the UPS")
+        XCTAssertEqual(text(.refused, "en").body, "The server refuses the request")
         XCTAssertEqual(text(.replaceBattery, "en").body, "Battery needs replacing")
     }
 
@@ -31,6 +32,7 @@ final class NotifierTests: XCTestCase {
         XCTAssertEqual(text(.unreachable, "fr").body, "Injoignable")
         XCTAssertEqual(text(.reachableAgain, "fr").body, "De nouveau joignable")
         XCTAssertEqual(text(.noData, "fr").body, "Le serveur n'a pas de données récentes de l'onduleur")
+        XCTAssertEqual(text(.refused, "fr").body, "Le serveur refuse la demande")
         XCTAssertEqual(text(.replaceBattery, "fr").body, "Batterie à remplacer")
     }
 
@@ -46,7 +48,7 @@ final class NotifierTests: XCTestCase {
 
     func testReachabilityIsNotNotifiedForAUpsThatOptedOut() {
         let quiet = entry("Bureau", notifyUnreachable: false)
-        for event in [Event.unreachable, .reachableAgain, .noData] {
+        for event in [Event.unreachable, .reachableAgain, .noData, .refused] {
             XCTAssertFalse(shouldNotify(event, entry: quiet, enabled: true), "\(event)")
             XCTAssertTrue(shouldNotify(event, entry: entry("Maison"), enabled: true), "\(event)")
         }
@@ -86,6 +88,8 @@ final class NotifierTests: XCTestCase {
         XCTAssertEqual(flagLabel("RB"), "Batterie à remplacer")
         let outOfReach = UpsRow(entry: entry("Maison"), snapshot: snapshot(.unreachable), displayed: nil, lastUpdate: nil)
         XCTAssertEqual(stateLabel(for: outOfReach), "hors de portée")
+        let refused = UpsRow(entry: entry("Maison"), snapshot: snapshot(.refused), displayed: .refused, lastUpdate: nil)
+        XCTAssertEqual(stateLabel(for: refused), "refusé par le serveur")
     }
 
     func testAnUnknownKeyIsReturnedAsIs() {

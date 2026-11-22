@@ -70,7 +70,8 @@ It lives in the menu bar and has no Dock icon.
 - **Settings** — add, edit and remove UPSes ("Test connection" lists the UPS names a
   server offers), the poll interval, notifications, opening at login.
 - **Notifications** — on battery, battery low, back on mains, unreachable, reachable
-  again, no fresh data, battery to replace. Nothing is notified at launch: only changes.
+  again, no fresh data, request refused by the server (access denied, unknown UPS name),
+  battery to replace. Nothing is notified at launch: only changes.
   A UPS is declared unreachable after three failed polls in a row, and failures are
   ignored while the Mac itself has no network or has just woken up.
 
@@ -144,9 +145,9 @@ ups  Description unavailable
 ```
 
 `--json` prints JSON instead, `--config <path>` reads another configuration file. Exit
-status: 0, 1 when a UPS is unreachable or has no data, 2 on a usage or configuration
-error. The CLI does not feed the Batteries widget: a published line lives only as long
-as the process that published it.
+status: 0, 1 when a UPS is unreachable, has no data or is refused by its server, 2 on a
+usage or configuration error. The CLI does not feed the Batteries widget: a published
+line lives only as long as the process that published it.
 
 ## Layout
 

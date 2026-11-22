@@ -20,6 +20,13 @@ final class MenuTests: XCTestCase {
             "1 low battery · 1 no data · 1 unreachable · 1 on mains")
     }
 
+    func testTheSummaryPutsARefusalAfterTheBatteryStates() {
+        L10n.forced = "en"
+        XCTAssertEqual(
+            menuSummary(for: [row("A", .onMains), row("B", .refused), row("C", .onBattery)]),
+            "1 on battery · 1 refused by the server · 1 on mains")
+    }
+
     func testTheSummaryInFrench() {
         L10n.forced = "fr"
         XCTAssertEqual(menuSummary(for: [row("A", .onMains), row("B", .onBattery)]), "1 sur batterie · 1 sur secteur")
@@ -39,6 +46,7 @@ final class MenuTests: XCTestCase {
         XCTAssertEqual(dotColor(for: row("A", .lowBattery)), .systemRed)
         XCTAssertEqual(dotColor(for: row("A", .unreachable)), .systemRed)
         XCTAssertEqual(dotColor(for: row("A", .noData)), .systemRed)
+        XCTAssertEqual(dotColor(for: row("A", .refused)), .systemRed)
         XCTAssertEqual(dotColor(for: row("A", nil)), .tertiaryLabelColor)
         XCTAssertEqual(dotColor(for: row("A", nil, polled: false)), .tertiaryLabelColor)
     }

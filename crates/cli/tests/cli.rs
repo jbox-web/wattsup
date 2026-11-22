@@ -109,6 +109,22 @@ fn status_formats_a_long_runtime_in_hours() {
 }
 
 #[test]
+fn status_reports_a_refusal_of_the_server_as_refused() {
+    let server = FakeUpsd::start();
+    server.reply("LIST VAR ups", &["ERR ACCESS-DENIED"]);
+    let setup = setup(&[("Maison", server.port())]);
+
+    let output = run(&setup, &["status"]);
+    assert_eq!(rows(&stdout(&output))[1], "Maison refused - - -");
+    assert_eq!(output.status.code(), Some(1));
+
+    let output = run(&setup, &["--json", "status"]);
+    let json: serde_json::Value = serde_json::from_str(&stdout(&output)).unwrap();
+    assert_eq!(json[0]["state"], "refused");
+    assert!(json[0]["error"].as_str().unwrap().contains("ACCESS-DENIED"));
+}
+
+#[test]
 fn status_reports_stale_data_as_no_data() {
     let server = FakeUpsd::start();
     server.reply("LIST VAR ups", &["ERR DATA-STALE"]);

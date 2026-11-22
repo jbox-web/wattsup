@@ -34,7 +34,7 @@ pub enum Value {
 
 /// `None` when there is nothing trustworthy to show: no fresh data, or no charge.
 pub fn details_for(name: &str, snapshot: &Snapshot) -> Option<SourceDetails> {
-    if matches!(snapshot.state, State::Unreachable | State::NoData) {
+    if matches!(snapshot.state, State::Unreachable | State::NoData | State::Refused) {
         return None;
     }
     let on_battery = matches!(snapshot.state, State::OnBattery | State::LowBattery);
@@ -213,6 +213,8 @@ mod tests {
         let no_data = Snapshot::from_error(&ClientError::NoData("DATA-STALE".into()));
         assert_eq!(details_for("Maison", &unreachable), None);
         assert_eq!(details_for("Maison", &no_data), None);
+        let refused = Snapshot::from_error(&ClientError::Server("ACCESS-DENIED".into()));
+        assert_eq!(details_for("Maison", &refused), None);
     }
 
     #[test]

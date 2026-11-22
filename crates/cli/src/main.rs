@@ -102,8 +102,9 @@ fn status(cli: &Cli) -> Result<u8, Failure> {
         print_table(&rows);
     }
 
-    let unhealthy =
-        snapshots.iter().any(|(_, snapshot)| matches!(snapshot.state, State::Unreachable | State::NoData));
+    let unhealthy = snapshots
+        .iter()
+        .any(|(_, snapshot)| matches!(snapshot.state, State::Unreachable | State::NoData | State::Refused));
     Ok(if unhealthy { EXIT_UNHEALTHY } else { 0 })
 }
 
@@ -183,6 +184,7 @@ fn state_label(state: State) -> &'static str {
         State::OnMains => "on mains",
         State::OnBattery => "on battery",
         State::LowBattery => "low battery",
+        State::Refused => "refused",
         State::NoData => "no data",
         State::Unreachable => "unreachable",
     }
@@ -193,6 +195,7 @@ fn state_key(state: State) -> &'static str {
         State::OnMains => "on_mains",
         State::OnBattery => "on_battery",
         State::LowBattery => "low_battery",
+        State::Refused => "refused",
         State::NoData => "no_data",
         State::Unreachable => "unreachable",
     }

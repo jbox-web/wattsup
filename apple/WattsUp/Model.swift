@@ -84,7 +84,7 @@ final class Model: ObservableObject {
         if rows.isEmpty { return .empty }
         switch worst(states: rows.compactMap(\.displayed)) {
         case .lowBattery, .onBattery: return .attention
-        case .unreachable, .noData: return .unreachable
+        case .unreachable, .noData, .refused: return .unreachable
         case .onMains, nil: return .allGood
         }
     }
@@ -244,12 +244,12 @@ final class Model: ObservableObject {
         rows[index].displayed = displayed
         rows[index].lastUpdate = Date()
 
-        let fresh = snapshot.state != .unreachable && snapshot.state != .noData
+        let fresh = ![.unreachable, .noData, .refused].contains(snapshot.state)
         if !entry.publish || displayed == nil {
             publish(entry.name, nil)
         } else if fresh {
             publish(entry.name, snapshot)
-        } else if displayed == .unreachable || displayed == .noData {
+        } else if displayed == .unreachable || displayed == .noData || displayed == .refused {
             // Declared, not just one lost poll: the line would show stale values.
             publish(entry.name, nil)
         }
@@ -283,6 +283,7 @@ func stateLabel(for row: UpsRow) -> String {
     case .onBattery: return tr("on battery")
     case .lowBattery: return tr("low battery")
     case .noData: return tr("no data")
+    case .refused: return tr("refused by the server")
     case .unreachable: return tr("unreachable")
     case nil: return tr("out of reach")
     }
@@ -290,7 +291,7 @@ func stateLabel(for row: UpsRow) -> String {
 
 /// The charge to show: none while the values are not current.
 func chargeLabel(for row: UpsRow) -> String? {
-    guard let displayed = row.displayed, displayed != .unreachable, displayed != .noData else { return nil }
+    guard let displayed = row.displayed, ![.unreachable, .noData, .refused].contains(displayed) else { return nil }
     return row.snapshot?.chargePercent.map { "\($0) %" }
 }
 

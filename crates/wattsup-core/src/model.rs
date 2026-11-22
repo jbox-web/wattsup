@@ -37,6 +37,9 @@ pub enum State {
     /// On battery and the UPS itself reports a low battery.
     LowBattery,
     OnBattery,
+    /// The server answers with an error about the request itself: access denied, unknown
+    /// UPS name, password required...
+    Refused,
     /// The server answers but has nothing usable from the UPS.
     NoData,
     Unreachable,
@@ -99,7 +102,8 @@ impl Snapshot {
     pub fn from_error(error: &ClientError) -> Snapshot {
         let state = match error {
             ClientError::Unreachable(_) => State::Unreachable,
-            _ => State::NoData,
+            ClientError::Server(_) => State::Refused,
+            ClientError::NoData(_) | ClientError::Protocol(_) => State::NoData,
         };
         Snapshot {
             state,
@@ -242,7 +246,8 @@ mod tests {
         let cases = [
             (ClientError::Unreachable("no answer within the timeout".into()), State::Unreachable),
             (ClientError::NoData("DATA-STALE".into()), State::NoData),
-            (ClientError::Server("UNKNOWN-UPS".into()), State::NoData),
+            (ClientError::Server("UNKNOWN-UPS".into()), State::Refused),
+            (ClientError::Server("ACCESS-DENIED".into()), State::Refused),
             (ClientError::Protocol(ProtocolError::UnterminatedQuote), State::NoData),
         ];
         for (error, state) in cases {
@@ -250,8 +255,12 @@ mod tests {
             assert_eq!(snap.state, state);
             assert!(snap.vars.is_empty());
             assert_eq!(snap.charge_percent, None);
-            assert_eq!(snap.error, Some(error.to_string()));
+            assert!(snap.error.is_some());
         }
+        let snap = Snapshot::from_error(&ClientError::Server("ACCESS-DENIED".into()));
+        assert_eq!(snap.error.as_deref(), Some("the server refused the request (ACCESS-DENIED)"));
+        let snap = Snapshot::from_error(&ClientError::NoData("DATA-STALE".into()));
+        assert_eq!(snap.error.as_deref(), Some("the server has no data from the UPS (DATA-STALE)"));
     }
 
     #[test]
@@ -259,6 +268,8 @@ mod tests {
         assert_eq!(worst(&[State::OnMains, State::Unreachable, State::OnBattery]), Some(State::OnBattery));
         assert_eq!(worst(&[State::NoData, State::LowBattery, State::OnBattery]), Some(State::LowBattery));
         assert_eq!(worst(&[State::Unreachable, State::NoData]), Some(State::NoData));
+        assert_eq!(worst(&[State::NoData, State::Refused, State::Unreachable]), Some(State::Refused));
+        assert_eq!(worst(&[State::Refused, State::OnBattery]), Some(State::OnBattery));
         assert_eq!(worst(&[State::OnMains]), Some(State::OnMains));
         assert_eq!(worst(&[]), None);
     }

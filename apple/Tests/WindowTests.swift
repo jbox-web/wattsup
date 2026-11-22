@@ -51,6 +51,12 @@ final class WindowTests: XCTestCase {
         XCTAssertNil(summary.runtime)
     }
 
+    func testARefusalShowsItsLabelAndNoValues() {
+        let summary = summary(for: row(snapshot(.refused, charge: 100), displayed: .refused))
+        XCTAssertEqual(summary.state, "refused by the server")
+        XCTAssertNil(summary.charge)
+    }
+
     func testBeforeTheFirstPoll() {
         let summary = summary(for: row(nil, displayed: nil))
         XCTAssertEqual(summary.state, "…")

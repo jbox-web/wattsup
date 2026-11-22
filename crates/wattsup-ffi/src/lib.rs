@@ -49,6 +49,7 @@ pub struct UpsName {
 pub enum State {
     LowBattery,
     OnBattery,
+    Refused,
     NoData,
     Unreachable,
     OnMains,
@@ -62,6 +63,7 @@ pub enum Event {
     Unreachable,
     ReachableAgain,
     NoData,
+    Refused,
     ReplaceBattery,
 }
 
@@ -230,6 +232,7 @@ impl From<model::State> for State {
         match state {
             model::State::LowBattery => State::LowBattery,
             model::State::OnBattery => State::OnBattery,
+            model::State::Refused => State::Refused,
             model::State::NoData => State::NoData,
             model::State::Unreachable => State::Unreachable,
             model::State::OnMains => State::OnMains,
@@ -242,6 +245,7 @@ impl From<State> for model::State {
         match state {
             State::LowBattery => model::State::LowBattery,
             State::OnBattery => model::State::OnBattery,
+            State::Refused => model::State::Refused,
             State::NoData => model::State::NoData,
             State::Unreachable => model::State::Unreachable,
             State::OnMains => model::State::OnMains,
@@ -258,6 +262,7 @@ impl From<changes::Event> for Event {
             changes::Event::Unreachable => Event::Unreachable,
             changes::Event::ReachableAgain => Event::ReachableAgain,
             changes::Event::NoData => Event::NoData,
+            changes::Event::Refused => Event::Refused,
             changes::Event::ReplaceBattery => Event::ReplaceBattery,
         }
     }

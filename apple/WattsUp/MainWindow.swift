@@ -20,7 +20,7 @@ struct VariableRow: Identifiable, Equatable {
 /// Values are shown only when the last poll succeeded and the UPS is in reach.
 private func currentSnapshot(of row: UpsRow) -> Snapshot? {
     guard row.displayed != nil, let snapshot = row.snapshot else { return nil }
-    return snapshot.state == .unreachable || snapshot.state == .noData ? nil : snapshot
+    return [.unreachable, .noData, .refused].contains(snapshot.state) ? nil : snapshot
 }
 
 func summary(for row: UpsRow) -> Summary {
@@ -56,7 +56,7 @@ func stateColor(for row: UpsRow) -> Color {
     switch row.displayed {
     case .onMains: return .green
     case .onBattery: return .orange
-    case .lowBattery, .unreachable, .noData: return .red
+    case .lowBattery, .unreachable, .noData, .refused: return .red
     case nil: return .secondary
     }
 }
