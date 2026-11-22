@@ -84,6 +84,9 @@ cargo run -p test-support --bin fake-upsd -- 34930 "OL:40" "OB DISCHRG:60" "OL:6
 
 ## Traps already met
 
+- **Xcode 27 to assemble the app.** With Xcode 26 the universal release build of
+  `apple/package.sh` fails to link (`library not found for -lwattsup_ffi`), while
+  `swift test` passes; the `app` job of CI runs on GitHub's `xcode-27` image for that reason.
 - **Case-insensitive disk.** Inside the bundle the app executable is named `Watt's Up`,
   not `WattsUp`: `WattsUp` and the CLI `wattsup` would be the same file.
 - **`MACOSX_DEPLOYMENT_TARGET` is not exported in `apple/build-bindings.sh`.** With it,

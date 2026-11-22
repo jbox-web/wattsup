@@ -1,0 +1,5 @@
+# GitHub's xcode-27 image (a preview, listed in actions/runner-images) is newer than
+# the runner labels actionlint knows about.
+self-hosted-runner:
+  labels:
+    - xcode-27

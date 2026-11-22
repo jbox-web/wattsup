@@ -25,7 +25,8 @@ needs macOS 14 or later, and is signed and notarized by Apple.
 
 ## Build from source
 
-Needs Rust, Xcode with its command-line tools, and [mise](https://mise.jdx.dev/).
+Needs Rust, Xcode 27 with its command-line tools (the universal release build does not
+link with Xcode 26), and [mise](https://mise.jdx.dev/).
 
 ```sh
 mise run dev:package   # builds apple/dist/Watt's Up.app

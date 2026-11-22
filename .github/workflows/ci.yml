@@ -103,8 +103,11 @@ jobs:
 
   # The whole path to the app: bindings, Swift tests, then the bundle itself. Building the
   # bundle here keeps apple/package.sh from breaking unnoticed until someone needs it.
+  # Xcode 27, the one releases are built with: the universal release build fails to link
+  # with the Xcode 26 of the macos-26 image ("library not found for -lwattsup_ffi").
+  # GitHub labels this image a preview.
   app:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - name: Git checkout
