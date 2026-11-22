@@ -18,7 +18,7 @@ cask "wattsup" do
   desc "Watch UPSes served by NUT servers from the menu bar"
   homepage "https://github.com/$repo"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Watt's Up.app"
   binary "#{appdir}/Watt's Up.app/Contents/MacOS/wattsup"

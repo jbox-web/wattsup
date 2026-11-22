@@ -9,6 +9,9 @@ cd "$(dirname "$0")/.."
 # them ("mis-aligned LINKEDIT string pool"). Nothing here compiles C, and rustc's own
 # default for Apple targets (macOS 11) is below the app's minimum, so it is not needed.
 profile=${PROFILE:-release}
+# cargo writes the "dev" profile into target/debug, every other profile under its own name.
+profile_dir=$profile
+[ "$profile" = dev ] && profile_dir=debug
 target_dir=${CARGO_TARGET_DIR:-target}
 out=apple/Generated
 work="$target_dir/apple-bindings"
@@ -17,7 +20,7 @@ mkdir -p "$out/Swift" "$work/headers"
 
 cargo build --profile "$profile" -p wattsup-ffi
 cargo run -q --profile "$profile" -p wattsup-ffi --bin uniffi-bindgen -- generate \
-  --library "$target_dir/$profile/libwattsup_ffi.dylib" --language swift --out-dir "$work"
+  --library "$target_dir/$profile_dir/libwattsup_ffi.dylib" --language swift --out-dir "$work"
 mv "$work/WattsUpCore.swift" "$out/Swift/"
 mv "$work/WattsUpCoreFFI.h" "$work/headers/"
 mv "$work/WattsUpCoreFFI.modulemap" "$work/headers/module.modulemap"
@@ -31,8 +34,8 @@ for target in aarch64-apple-darwin x86_64-apple-darwin; do
   cargo build --profile "$profile" -p wattsup-ffi --target "$target"
 done
 lipo -create \
-  "$target_dir/aarch64-apple-darwin/$profile/libwattsup_ffi.a" \
-  "$target_dir/x86_64-apple-darwin/$profile/libwattsup_ffi.a" \
+  "$target_dir/aarch64-apple-darwin/$profile_dir/libwattsup_ffi.a" \
+  "$target_dir/x86_64-apple-darwin/$profile_dir/libwattsup_ffi.a" \
   -output "$work/libwattsup_ffi.a"
 xcodebuild -create-xcframework -library "$work/libwattsup_ffi.a" -headers "$work/headers" \
   -output "$out/WattsUpCoreFFI.xcframework" >/dev/null

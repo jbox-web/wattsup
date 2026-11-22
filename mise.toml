@@ -51,6 +51,11 @@ timeout = "7200s"
 [tasks."dev:install"]
 description = "Quit the running app and copy the built one to /Applications"
 run = """
+# Checked first: without a build, the installed app must not be removed for nothing.
+if [ ! -d "apple/dist/Watt's Up.app" ]; then
+  echo "no apple/dist/Watt's Up.app: run mise run dev:package first" >&2
+  exit 1
+fi
 osascript -e 'tell application id "fr.nicoladmin.wattsup" to quit' 2>/dev/null || true
 rm -rf "/Applications/Watt's Up.app"
 ditto "apple/dist/Watt's Up.app" "/Applications/Watt's Up.app"
