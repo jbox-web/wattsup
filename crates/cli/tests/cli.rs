@@ -252,3 +252,52 @@ fn an_invalid_configuration_is_reported_with_its_path() {
     assert!(stderr(&output).contains(setup.config.to_str().unwrap()), "{}", stderr(&output));
     assert_eq!(output.status.code(), Some(2));
 }
+
+#[test]
+fn a_password_missing_from_the_keychain_does_not_hide_the_other_upses() {
+    let server = FakeUpsd::start();
+    server.vars("ups", VARS);
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join("config.toml");
+    // A name no Keychain holds a password for.
+    let name = format!("NoPassword{}", std::process::id());
+    fs::write(
+        &config,
+        format!(
+            "[[ups]]\nname = \"Maison\"\nhost = \"127.0.0.1\"\nport = {port}\nups = \"ups\"\n\n\
+             [[ups]]\nname = \"{name}\"\nhost = \"127.0.0.1\"\nport = {port}\nups = \"ups\"\nusername = \"monuser\"\n",
+            port = server.port()
+        ),
+    )
+    .unwrap();
+    let setup = Setup { _dir: dir, config };
+
+    let output = run(&setup, &["status"]);
+
+    let rows = rows(&stdout(&output));
+    assert_eq!(rows.len(), 3, "{rows:?}");
+    assert_eq!(rows[1], "Maison on mains 100% 47m 10%");
+    assert!(rows[2].starts_with(&name), "{rows:?}");
+    assert!(
+        stderr(&output).contains(&format!("no password for \"{name}\" in the Keychain")),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn list_reads_an_ipv6_address() {
+    let server = FakeUpsd::start();
+    server.reply("LIST UPS", &["BEGIN LIST UPS", r#"UPS ups "Garage""#, "END LIST UPS"]);
+    let setup = setup(&[]);
+
+    // Nothing listens on these: what matters is the address the client tried, which the
+    // error names (host ::1, then the port given or the default 3493).
+    let output = run(&setup, &["list", "[::1]:1"]);
+    assert!(stderr(&output).contains("[::1]:1: "), "{}", stderr(&output));
+    let output = run(&setup, &["list", "::1"]);
+    assert!(stderr(&output).contains("[::1]:3493: "), "{}", stderr(&output));
+
+    let output = run(&setup, &["list", &format!("127.0.0.1:{}", server.port())]);
+    assert_eq!(rows(&stdout(&output)), ["ups Garage"]);
+}

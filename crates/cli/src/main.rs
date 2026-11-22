@@ -115,7 +115,7 @@ fn vars(cli: &Cli, name: &str) -> Result<u8, Failure> {
         .iter()
         .find(|entry| entry.name.to_lowercase() == name.to_lowercase())
         .ok_or_else(|| usage(format!("no UPS named \"{name}\"")))?;
-    let vars = list_vars(&endpoint(entry), &entry.ups, credentials(entry)?.as_ref(), TIMEOUT)
+    let vars = list_vars(&endpoint(entry), &entry.ups, credentials(entry).as_ref(), TIMEOUT)
         .map_err(|error| Failure { message: format!("{}: {error}", entry.name), code: EXIT_UNHEALTHY })?;
     if cli.json {
         println!("{}", json!(vars));
@@ -128,13 +128,8 @@ fn vars(cli: &Cli, name: &str) -> Result<u8, Failure> {
 }
 
 fn list(cli: &Cli, server: &str) -> Result<u8, Failure> {
-    let (host, port) = match server.rsplit_once(':') {
-        Some((host, port)) => {
-            (host, port.parse().map_err(|_| usage(format!("invalid port in \"{server}\"")))?)
-        }
-        None => (server, DEFAULT_PORT),
-    };
-    let names = list_ups(&Endpoint { host: host.to_string(), port }, TIMEOUT)
+    let (host, port) = parse_server(server).map_err(usage)?;
+    let names = list_ups(&Endpoint { host, port }, TIMEOUT)
         .map_err(|error| Failure { message: format!("{server}: {error}"), code: EXIT_UNHEALTHY })?;
     if cli.json {
         let rows: Vec<_> = names
@@ -152,8 +147,28 @@ fn endpoint(entry: &UpsEntry) -> Endpoint {
     Endpoint { host: entry.host.clone(), port: entry.port }
 }
 
+/// `host`, `host:port`, `[v6 address]:port`, or a bare IPv6 address (several colons, no port).
+fn parse_server(server: &str) -> Result<(String, u16), String> {
+    let invalid = || format!("invalid port in \"{server}\"");
+    if let Some(rest) = server.strip_prefix('[') {
+        let (host, after) = rest.split_once(']').ok_or_else(|| format!("missing ] in \"{server}\""))?;
+        let port = match after.strip_prefix(':') {
+            Some(port) => port.parse().map_err(|_| invalid())?,
+            None if after.is_empty() => DEFAULT_PORT,
+            None => return Err(invalid()),
+        };
+        return Ok((host.to_string(), port));
+    }
+    match server.split_once(':') {
+        Some((host, port)) if !port.contains(':') => {
+            Ok((host.to_string(), port.parse().map_err(|_| invalid())?))
+        }
+        _ => Ok((server.to_string(), DEFAULT_PORT)),
+    }
+}
+
 fn poll(entry: &UpsEntry) -> Result<Snapshot, Failure> {
-    let credentials = credentials(entry)?;
+    let credentials = credentials(entry);
     Ok(match list_vars(&endpoint(entry), &entry.ups, credentials.as_ref(), TIMEOUT) {
         Ok(vars) => Snapshot::from_vars(vars),
         Err(error) => Snapshot::from_error(&error),
@@ -161,11 +176,21 @@ fn poll(entry: &UpsEntry) -> Result<Snapshot, Failure> {
 }
 
 /// The NUT credentials of an entry that has a username; the password comes from the Keychain.
-fn credentials(entry: &UpsEntry) -> Result<Option<Credentials>, Failure> {
-    let Some(username) = &entry.username else { return Ok(None) };
-    let password = keychain_password(&keychain_service(&entry.name), username)
-        .ok_or_else(|| usage(format!("cannot read the password for \"{}\" from the Keychain", entry.name)))?;
-    Ok(Some(Credentials { username: username.clone(), password }))
+/// The NUT credentials of an entry that has a username. Without a readable password the
+/// UPS is polled without credentials, as the app does: the server then says whether it
+/// needs them, and the other UPSes are not held back.
+fn credentials(entry: &UpsEntry) -> Option<Credentials> {
+    let username = entry.username.as_ref()?;
+    match keychain_password(&keychain_service(&entry.name), username) {
+        Some(password) => Some(Credentials { username: username.clone(), password }),
+        None => {
+            eprintln!(
+                "wattsup: no password for \"{}\" in the Keychain: polled without credentials",
+                entry.name
+            );
+            None
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -249,5 +274,24 @@ fn print_table<const N: usize>(rows: &[[String; N]]) {
         let line: Vec<String> =
             row.iter().zip(widths).map(|(cell, width)| format!("{cell:<width$}")).collect();
         println!("{}", line.join("  ").trim_end());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_server;
+
+    #[test]
+    fn reads_every_form_of_server_address() {
+        assert_eq!(parse_server("nas"), Ok(("nas".into(), 3493)));
+        assert_eq!(parse_server("nas:3500"), Ok(("nas".into(), 3500)));
+        assert_eq!(parse_server("192.0.2.10:3500"), Ok(("192.0.2.10".into(), 3500)));
+        assert_eq!(parse_server("::1"), Ok(("::1".into(), 3493)));
+        assert_eq!(parse_server("fe80::1:2"), Ok(("fe80::1:2".into(), 3493)));
+        assert_eq!(parse_server("[::1]"), Ok(("::1".into(), 3493)));
+        assert_eq!(parse_server("[::1]:3500"), Ok(("::1".into(), 3500)));
+        assert!(parse_server("nas:port").is_err());
+        assert!(parse_server("[::1]:x").is_err());
+        assert!(parse_server("[::1").is_err());
     }
 }
