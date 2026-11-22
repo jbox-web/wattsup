@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the Rust core for the macOS app and generates its Swift bindings:
 #   apple/Generated/Swift/WattsUpCore.swift        (SwiftPM target WattsUpCore)
-#   apple/Generated/WattsUpCoreFFI.xcframework     (static library, one slice per installed Rust target)
+#   apple/Generated/WattsUpCoreFFI.xcframework     (static library, arm64 + x86_64)
 set -eu
 cd "$(dirname "$0")/.."
 # MACOSX_DEPLOYMENT_TARGET is deliberately left unset. Exported (14.0), it also applies to
@@ -22,19 +22,18 @@ mv "$work/WattsUpCore.swift" "$out/Swift/"
 mv "$work/WattsUpCoreFFI.h" "$work/headers/"
 mv "$work/WattsUpCoreFFI.modulemap" "$work/headers/module.modulemap"
 
-libs=""
+# Both architectures, always: the app is universal, and a slice missing here only shows up
+# later as "library not found" when Swift links the other one. Both Rust targets come with
+# the rust tool of mise.toml; cargo says so plainly if one is missing. (Asking rustup which
+# targets are installed is not reliable: it answers for its default toolchain, which may
+# not be the one mise pins.)
 for target in aarch64-apple-darwin x86_64-apple-darwin; do
-  if rustup target list --installed 2>/dev/null | grep -qx "$target"; then
-    cargo build --profile "$profile" -p wattsup-ffi --target "$target"
-    libs="$libs $target_dir/$target/$profile/libwattsup_ffi.a"
-  fi
+  cargo build --profile "$profile" -p wattsup-ffi --target "$target"
 done
-if [ -n "$libs" ]; then
-  # shellcheck disable=SC2086
-  lipo -create $libs -output "$work/libwattsup_ffi.a"
-else
-  cp "$target_dir/$profile/libwattsup_ffi.a" "$work/"
-fi
+lipo -create \
+  "$target_dir/aarch64-apple-darwin/$profile/libwattsup_ffi.a" \
+  "$target_dir/x86_64-apple-darwin/$profile/libwattsup_ffi.a" \
+  -output "$work/libwattsup_ffi.a"
 xcodebuild -create-xcframework -library "$work/libwattsup_ffi.a" -headers "$work/headers" \
   -output "$out/WattsUpCoreFFI.xcframework" >/dev/null
 echo "bindings in $out"
