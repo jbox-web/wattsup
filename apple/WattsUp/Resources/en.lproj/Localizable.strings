@@ -85,3 +85,11 @@
 "Source code on GitHub" = "Source code on GitHub";
 "refused by the server" = "refused by the server";
 "The server refuses the request" = "The server refuses the request";
+"Watt's Up: waiting for the UPSes" = "Watt's Up: waiting for the UPSes";
+"Waiting for the first poll." = "Waiting for the first poll.";
+"The server reports no variables." = "The server reports no variables.";
+"No variables: the last poll failed." = "No variables: the last poll failed.";
+"macOS does not let Watt's Up show notifications: allow them in System Settings." = "macOS does not let Watt's Up show notifications: allow them in System Settings.";
+"Open System Settings…" = "Open System Settings…";
+"password not readable from the Keychain" = "password not readable from the Keychain";
+"The password cannot be read from the Keychain" = "The password cannot be read from the Keychain";

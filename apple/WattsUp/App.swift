@@ -29,20 +29,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let publisher = self.publisher
         model = Model(
             poller: CorePoller(), configPath: Self.configPath, networkOnline: { network.isOnline },
-            secrets: Keychain(),
+            secrets: Keychain(), keychainPrefix: Self.keychainPrefix,
             publish: { name, snapshot in publisher.set(name: name, snapshot: snapshot) })
-        let settings = SettingsWindowController(model: model)
+        let notifier = Notifier()
+        self.notifier = notifier
+        let settings = SettingsWindowController(model: model, notifier: notifier)
         settingsWindow = settings
         let window = MainWindowController(model: model, openSettings: { settings.show(.upses) })
         mainWindow = window
         statusMenu = StatusMenu(model: model, openWindow: { window.show() }, openSettings: { settings.show($0) })
-        let notifier = Notifier()
-        self.notifier = notifier
         model.onEvents = { [weak model] entry, events in
             let snapshot = model?.rows.first { $0.entry.name == entry.name }?.snapshot
             notifier.handle(events, entry: entry, snapshot: snapshot)
         }
         model.start()
+    }
+
+    /// A trial run (`WATTSUP_CONFIG` set) keeps its passwords apart from the real ones.
+    private static var keychainPrefix: String {
+        ProcessInfo.processInfo.environment["WATTSUP_CONFIG"] == nil ? "jbox.wattsup." : "jbox.wattsup-trial."
     }
 
     /// `WATTSUP_CONFIG` points a development run at another file than the user's.

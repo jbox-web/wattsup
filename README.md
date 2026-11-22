@@ -68,7 +68,8 @@ It lives in the menu bar and has no Dock icon.
 - **Window** — every UPS with its state, charge, runtime and load, and all the variables
   its NUT server reports.
 - **Settings** — add, edit and remove UPSes ("Test connection" lists the UPS names a
-  server offers), the poll interval, notifications, opening at login.
+  server offers), the poll interval, notifications (with a warning and a link to System
+  Settings when macOS blocks them), opening at login.
 - **Notifications** — on battery, battery low, back on mains, unreachable, reachable
   again, no fresh data, request refused by the server (access denied, unknown UPS name),
   battery to replace. Nothing is notified at launch: only changes.
@@ -114,16 +115,22 @@ username = "monuser"             # only if the server asks for one
 
 A password never goes in this file: it lives in the macOS Keychain, as the generic
 password of service `jbox.wattsup.<name>` and account `<username>`. The settings
-window stores it; by hand (the app reads passwords at launch):
+window stores it; by hand (the app reads it at each poll, no restart needed):
 
 ```sh
 security add-generic-password -U -s jbox.wattsup.Home -a monuser -w
 ```
 
+The app reads the password once, at its first poll after launch or after a settings
+change. When the Keychain refuses to give it, the UPS shows "password not readable from
+the Keychain". A password missing from the Keychain means a poll without credentials, as
+in the CLI, which warns about it and goes on with the other UPSes.
+
 Authentication has only been exercised against the fake server of the test suite: none
 of the servers this was developed with asks for one. TLS (`STARTTLS`) is not supported.
 
-`WATTSUP_CONFIG=/path/to/config.toml` makes the app read another file, for trials.
+`WATTSUP_CONFIG=/path/to/config.toml` makes the app read another file, for trials. Its
+passwords then go under `jbox.wattsup-trial.<name>`, apart from the real ones.
 
 ## Command line
 

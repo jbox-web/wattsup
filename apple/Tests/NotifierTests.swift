@@ -68,6 +68,25 @@ final class NotifierTests: XCTestCase {
         return "\(root.path): \(files.sorted().joined(separator: ", "))"
     }
 
+    func testWarnsWhenMacOSBlocksTheNotificationsTheUserWants() {
+        L10n.forced = "en"
+        XCTAssertEqual(
+            notificationsWarning(blockedByMacOS: true, enabled: true),
+            "macOS does not let Watt's Up show notifications: allow them in System Settings.")
+        XCTAssertNil(notificationsWarning(blockedByMacOS: false, enabled: true))
+        XCTAssertNil(notificationsWarning(blockedByMacOS: true, enabled: false))
+        L10n.forced = "fr"
+        XCTAssertEqual(
+            notificationsWarning(blockedByMacOS: true, enabled: true),
+            "macOS empêche Watt's Up d'afficher des notifications : autorisez-les dans les Réglages Système.")
+    }
+
+    func testTheSettingsLinkPointsAtTheAppsNotificationPage() {
+        XCTAssertEqual(
+            notificationSettingsURL.absoluteString,
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=fr.nicoladmin.wattsup")
+    }
+
     func testBothLanguagesHaveTheSameKeys() throws {
         let english = try XCTUnwrap(L10n.table("en"), bundleContents)
         let french = try XCTUnwrap(L10n.table("fr"), bundleContents)

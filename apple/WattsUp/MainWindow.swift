@@ -41,14 +41,21 @@ func runtimeLabel(_ seconds: UInt32) -> String {
     return minutes < 60 ? "\(minutes) min" : String(format: "%d h %02d min", minutes / 60, minutes % 60)
 }
 
-/// The variables of the last successful poll, sorted by name; the filter matches names and
-/// values, whatever the case.
+/// The variables of the last poll, sorted by name; the filter matches names and values,
+/// whatever the case. A failed poll has none: `emptyTableMessage` says why.
 func variableRows(for row: UpsRow, filter: String) -> [VariableRow] {
     let needle = filter.trimmingCharacters(in: .whitespaces).lowercased()
     return (row.snapshot?.vars ?? [:])
         .filter { needle.isEmpty || $0.key.lowercased().contains(needle) || $0.value.lowercased().contains(needle) }
         .sorted { $0.key < $1.key }
         .map { VariableRow(name: $0.key, value: $0.value) }
+}
+
+/// Why the table of variables is empty, or nil when it is not.
+func emptyTableMessage(for row: UpsRow) -> String? {
+    guard let snapshot = row.snapshot else { return tr("Waiting for the first poll.") }
+    guard snapshot.vars.isEmpty else { return nil }
+    return snapshot.error == nil ? tr("The server reports no variables.") : tr("No variables: the last poll failed.")
 }
 
 func stateColor(for row: UpsRow) -> Color {
@@ -176,6 +183,11 @@ private struct DetailView: View {
             Table(variables) {
                 TableColumn("Variable") { Text($0.name).textSelection(.enabled) }
                 TableColumn("Value") { Text($0.value).textSelection(.enabled) }
+            }
+            .overlay {
+                if let message = emptyTableMessage(for: row) {
+                    Text(message).foregroundStyle(.secondary)
+                }
             }
             .searchable(text: $filter, placement: .toolbar, prompt: "Filter variables")
             if let lastUpdate = row.lastUpdate {

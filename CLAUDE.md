@@ -40,7 +40,8 @@ then Swift does not see it.
 
 To watch the app react without a real power cut, run the fake server and point an entry
 of a trial configuration at it (`WATTSUP_CONFIG=/path/to/file` makes the app read another
-file than `~/.config/wattsup/config.toml`):
+file than `~/.config/wattsup/config.toml`, and keep its passwords under
+`jbox.wattsup-trial.<name>`):
 
 ```sh
 cargo run -p test-support --bin fake-upsd -- 34930 "OL:40" "OB DISCHRG:60" "OL:600"
@@ -57,9 +58,13 @@ cargo run -p test-support --bin fake-upsd -- 34930 "OL:40" "OB DISCHRG:60" "OL:6
 - **No secret** in the configuration file, a log, or an error message. NUT passwords live
   in the macOS Keychain (service `jbox.wattsup.<name>`, account = the NUT username).
   `Credentials` has no `Debug` on purpose.
-- **One site never delays another.** Each UPS has its own poll loop; the blocking poll
-  runs on a GCD thread, not on Swift's cooperative pool. A result that arrives after a
-  stop, a reload or a newer poll is dropped (`awaited` in `Model.swift`).
+- **One site never delays another.** Each UPS has its own poll loop; its blocking calls
+  (the poll, and the Keychain read it needs, cached until the next reload) run on a GCD
+  thread, never on the main thread nor Swift's cooperative pool. Editing an entry in the
+  settings still touches the Keychain on the main thread. A request has an overall
+  deadline (three timeouts, checked at every socket read) and a 64 KiB line limit, and
+  name resolution is bounded too. A result that arrives after a stop, a reload or a
+  newer poll is dropped (`awaited` in `Model.swift`).
 - **The app never overwrites a configuration it could not read.** Every edit re-reads the
   file from disk and applies the change to that (`Model.edit`).
 - **Strings are keyed by their English text.** SwiftUI views localize by themselves; code

@@ -9,6 +9,7 @@ func menuIcon(for look: MenuLook) -> NSImage? {
     case .attention: candidates = ["bolt.batteryblock.fill", "battery.25percent", "bolt.fill"]
     case .unreachable: candidates = ["bolt.slash", "exclamationmark.triangle"]
     case .empty: candidates = ["powerplug", "bolt"]
+    case .waiting: candidates = ["ellipsis.circle", "bolt"]
     }
     for name in candidates {
         if let image = NSImage(systemSymbolName: name, accessibilityDescription: accessibilityLabel(for: look)) {
@@ -24,7 +25,7 @@ func menuTint(for look: MenuLook) -> NSColor? {
     switch look {
     case .attention: return .systemOrange
     case .unreachable: return .systemRed
-    case .allGood, .empty: return nil
+    case .allGood, .empty, .waiting: return nil
     }
 }
 
@@ -34,5 +35,6 @@ func accessibilityLabel(for look: MenuLook) -> String {
     case .attention: return tr("Watt's Up: a UPS is on battery")
     case .unreachable: return tr("Watt's Up: a UPS is unreachable")
     case .empty: return tr("Watt's Up: no UPS configured")
+    case .waiting: return tr("Watt's Up: waiting for the UPSes")
     }
 }

@@ -85,3 +85,11 @@
 "Source code on GitHub" = "Code source sur GitHub";
 "refused by the server" = "refusé par le serveur";
 "The server refuses the request" = "Le serveur refuse la demande";
+"Watt's Up: waiting for the UPSes" = "Watt's Up : en attente des onduleurs";
+"Waiting for the first poll." = "En attente de la première lecture.";
+"The server reports no variables." = "Le serveur ne fournit aucune variable.";
+"No variables: the last poll failed." = "Aucune variable : la dernière lecture a échoué.";
+"macOS does not let Watt's Up show notifications: allow them in System Settings." = "macOS empêche Watt's Up d'afficher des notifications : autorisez-les dans les Réglages Système.";
+"Open System Settings…" = "Ouvrir les Réglages Système…";
+"password not readable from the Keychain" = "mot de passe illisible dans le Trousseau";
+"The password cannot be read from the Keychain" = "Le mot de passe est illisible dans le Trousseau";

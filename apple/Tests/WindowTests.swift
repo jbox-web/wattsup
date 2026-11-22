@@ -82,6 +82,15 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(rows.map(\.name), ["device.mfr"])
     }
 
+    func testAFailedPollExplainsTheEmptyTable() {
+        L10n.forced = "en"
+        let failed = row(snapshot(.unreachable, error: "unreachable: no answer"), displayed: .onMains)
+        XCTAssertTrue(variableRows(for: failed, filter: "").isEmpty)
+        XCTAssertEqual(emptyTableMessage(for: failed), "No variables: the last poll failed.")
+        XCTAssertNil(emptyTableMessage(for: row(snapshot(.onMains, vars: ["ups.status": "OL"]), displayed: .onMains)))
+        XCTAssertEqual(emptyTableMessage(for: row(nil, displayed: nil)), "Waiting for the first poll.")
+    }
+
     func testNoVariablesBeforeTheFirstPoll() {
         XCTAssertTrue(variableRows(for: row(nil, displayed: nil), filter: "").isEmpty)
     }

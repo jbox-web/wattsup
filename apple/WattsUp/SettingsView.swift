@@ -18,8 +18,9 @@ final class SettingsWindowController {
     private let window: NSWindow
     private let selection = SettingsView.Selection()
 
-    init(model: Model) {
-        let content = NSHostingController(rootView: SettingsView(model: model, selection: selection))
+    init(model: Model, notifier: Notifier) {
+        let content = NSHostingController(
+            rootView: SettingsView(model: model, notifier: notifier, selection: selection))
         window = NSWindow(contentViewController: content)
         window.title = tr("Settings")
         window.styleMask = [.titled, .closable]
@@ -44,12 +45,13 @@ struct SettingsView: View {
     }
 
     @ObservedObject var model: Model
+    @ObservedObject var notifier: Notifier
     @ObservedObject var selection: Selection
 
     var body: some View {
         TabView(selection: $selection.tab) {
             UpsSettings(model: model).tabItem { Label("UPSes", systemImage: "bolt.batteryblock") }.tag(Tab.upses)
-            GeneralSettings(model: model).tabItem { Label("General", systemImage: "gearshape") }.tag(Tab.general)
+            GeneralSettings(model: model, notifier: notifier).tabItem { Label("General", systemImage: "gearshape") }.tag(Tab.general)
             AboutView().tabItem { Label("About", systemImage: "info.circle") }.tag(Tab.about)
         }
         .padding(20)
@@ -92,6 +94,7 @@ private struct AboutView: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var model: Model
+    @ObservedObject var notifier: Notifier
     @AppStorage(Preferences.notificationsKey) private var notifications = true
     @SwiftUI.State private var openAtLogin = SMAppService.mainApp.status == .enabled
     @SwiftUI.State private var interval = 30
@@ -110,6 +113,12 @@ private struct GeneralSettings: View {
                     attempt { try model.setPollInterval(UInt32(seconds)) }
                 }
                 Toggle("Notifications", isOn: $notifications)
+                if let warning = notificationsWarning(blockedByMacOS: notifier.blockedByMacOS, enabled: notifications) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                        Button("Open System Settings…") { NSWorkspace.shared.open(notificationSettingsURL) }
+                    }
+                }
                 Toggle("Open at login", isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { _, enabled in setOpenAtLogin(enabled) }
             }
@@ -120,7 +129,14 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { interval = Int(model.pollIntervalSeconds) }
+        .onAppear {
+            interval = Int(model.pollIntervalSeconds)
+            notifier.refresh()
+        }
+        // Back from System Settings, the window may still be open: read the setting again.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            notifier.refresh()
+        }
     }
 
     private func attempt(_ change: () throws -> Void) {

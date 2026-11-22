@@ -101,12 +101,6 @@ pub fn save_config(config: Config, path: String) -> Result<(), CoreError> {
     config::Config::from(config).save(Path::new(&path)).map_err(|error| CoreError::Config(error.to_string()))
 }
 
-/// The Keychain service that holds the NUT password of an entry.
-#[uniffi::export]
-pub fn keychain_service(name: String) -> String {
-    config::keychain_service(&name)
-}
-
 /// The UPS names a server offers. Blocking.
 #[uniffi::export]
 pub fn list_ups(host: String, port: u16) -> Result<Vec<UpsName>, CoreError> {

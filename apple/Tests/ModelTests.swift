@@ -25,11 +25,12 @@ final class ModelTests: XCTestCase {
         config?.cleanUp()
     }
 
-    private func model(_ entries: [UpsEntry]) throws -> Model {
+    private func model(_ entries: [UpsEntry], keychainPrefix: String = "jbox.wattsup.") throws -> Model {
         config = try TemporaryConfig(entries)
         let model = Model(
             poller: poller, configPath: config.path, networkOnline: { [unowned self] in self.online },
-            secrets: secrets, publish: { [unowned self] name, snapshot in self.published.append((name, snapshot)) })
+            secrets: secrets, keychainPrefix: keychainPrefix,
+            publish: { [unowned self] name, snapshot in self.published.append((name, snapshot)) })
         model.onEvents = { [unowned self] entry, events in self.events.append((entry.name, events)) }
         return model
     }
@@ -105,6 +106,91 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.menuLook, .allGood)
     }
 
+    func testTheIconWaitsUntilAUpsHasAnswered() async throws {
+        let model = try model([entry("Maison")])
+        XCTAssertEqual(model.menuLook, .waiting)
+        poller.set("Maison", snapshot(.onMains))
+        await model.pollOnce("Maison")
+        XCTAssertEqual(model.menuLook, .allGood)
+    }
+
+    func testTheIconWaitsWhileTheMacIsOffline() async throws {
+        let model = try model([entry("Maison")])
+        online = false
+        poller.set("Maison", snapshot(.unreachable))
+        await model.pollOnce("Maison")
+        XCTAssertEqual(model.menuLook, .waiting)
+    }
+
+    func testTheKeychainIsReadOffTheMainThread() async throws {
+        secrets.stored["jbox.wattsup.Maison|monuser"] = "secret"
+        let model = try model([entry("Maison", username: "monuser")])
+        poller.set("Maison", snapshot(.onMains))
+        await model.pollOnce("Maison")
+        XCTAssertFalse(secrets.readOnMainThread)
+        XCTAssertEqual(poller.passwordSeen(for: "Maison"), .some(.some("secret")))
+    }
+
+    func testThePasswordIsReadOnceUntilTheNextReload() async throws {
+        secrets.stored["jbox.wattsup.Maison|monuser"] = "secret"
+        let model = try model([entry("Maison", username: "monuser")])
+        poller.set("Maison", snapshot(.onMains))
+        for _ in 0..<3 { await model.pollOnce("Maison") }
+        XCTAssertEqual(secrets.reads, 1)
+        model.reload()
+        await model.pollOnce("Maison")
+        XCTAssertEqual(secrets.reads, 2)
+    }
+
+    func testAKeychainThatRefusesIsNotAskedAgainAtEachPoll() async throws {
+        secrets.failReads = true
+        let model = try model([entry("Maison", username: "monuser")])
+        poller.set("Maison", snapshot(.onMains))
+        for _ in 0..<3 { await model.pollOnce("Maison") }
+        XCTAssertEqual(secrets.reads, 1)
+        XCTAssertEqual(model.rows[0].displayed, .refused)
+    }
+
+    func testAKeychainFailureIsNamedAsSuch() async throws {
+        L10n.forced = "en"
+        secrets.failReads = true
+        let model = try model([entry("Maison", username: "monuser")])
+        poller.set("Maison", snapshot(.onMains))
+        await model.pollOnce("Maison")
+        XCTAssertEqual(stateLabel(for: model.rows[0]), "password not readable from the Keychain")
+        let text = notificationText(for: .refused, entry: entry("Maison"), snapshot: model.rows[0].snapshot)
+        XCTAssertEqual(text.body, "The password cannot be read from the Keychain")
+        XCTAssertEqual(model.rows[0].snapshot?.error?.components(separatedBy: "Keychain").count, 2)
+    }
+
+    func testAKeychainThatCannotBeReadIsReported() async throws {
+        secrets.failReads = true
+        let model = try model([entry("Maison", username: "monuser")])
+        poller.set("Maison", snapshot(.onMains))
+        await model.pollOnce("Maison")
+        XCTAssertEqual(model.rows[0].displayed, .refused)
+        XCTAssertTrue(model.rows[0].snapshot?.error?.contains("Keychain") ?? false, "\(String(describing: model.rows[0].snapshot?.error))")
+    }
+
+    func testATrialRunKeepsItsPasswordsApart() throws {
+        let model = try model([], keychainPrefix: "jbox.wattsup-trial.")
+        try model.add(entry("Maison", username: "monuser"), password: "secret")
+        XCTAssertEqual(secrets.stored, ["jbox.wattsup-trial.Maison|monuser": "secret"])
+    }
+
+    func testTheModelIsReleasedWhileItsLoopsSleep() async throws {
+        weak var released: Model?
+        do {
+            let model = try model([entry("Maison")])
+            poller.set("Maison", snapshot(.onMains))
+            model.start()
+            try await Task.sleep(nanoseconds: 200_000_000)
+            released = model
+        }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertNil(released)
+    }
+
     func testNoUpsIsEmpty() throws {
         XCTAssertEqual(try model([]).menuLook, .empty)
     }
@@ -117,7 +203,7 @@ final class ModelTests: XCTestCase {
         poller.set("Maison", snapshot(.unreachable))
         for _ in 0..<5 { await model.pollOnce("Maison") }
         XCTAssertNil(model.rows[0].displayed)
-        XCTAssertEqual(model.menuLook, .allGood)
+        XCTAssertEqual(model.menuLook, .waiting)
         XCTAssertTrue(events.isEmpty)
     }
 
@@ -288,8 +374,10 @@ final class ModelTests: XCTestCase {
     func testTestingAConnectionListsTheNamesOrExplainsTheFailure() async throws {
         let model = try model([])
         poller.names = .success([UpsName(name: "ups", description: "Garage")])
-        let found = await model.testConnection(host: "nas.example", port: 3493)
+        let found = await model.testConnection(host: "nas.example", port: 3500)
         XCTAssertEqual(try found.get().map(\.name), ["ups"])
+        XCTAssertEqual(poller.listedServer?.host, "nas.example")
+        XCTAssertEqual(poller.listedServer?.port, 3500)
         poller.names = .failure(CoreError.Server(message: "unreachable: connection refused"))
         let failed = await model.testConnection(host: "nas.example", port: 3493)
         guard case .failure(let message) = failed else { return XCTFail("expected a failure") }

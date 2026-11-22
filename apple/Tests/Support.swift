@@ -45,9 +45,18 @@ final class FakePoller: Poller, @unchecked Sendable {
     }
 
     var names: Result<[UpsName], Error> = .success([])
+    private var listed: (host: String, port: UInt16)?
+    var listedServer: (host: String, port: UInt16)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return listed
+    }
 
     func listUps(host: String, port: UInt16) throws -> [UpsName] {
-        try names.get()
+        lock.lock()
+        listed = (host, port)
+        lock.unlock()
+        return try names.get()
     }
 
     func poll(entry: UpsEntry, password: String?) -> Snapshot {
@@ -83,18 +92,56 @@ struct TemporaryConfig {
 }
 
 /// Secrets kept in memory, for tests.
-final class MemorySecrets: SecretStore {
+/// Secrets kept in memory, for tests. Reads come from the poll threads, the rest from the
+/// test: every access goes through the lock.
+final class MemorySecrets: SecretStore, @unchecked Sendable {
     struct Refused: Error {}
 
-    var stored: [String: String] = [:]
-    /// Make the next writes or deletions fail, as a locked Keychain would.
-    var failWrites = false
-    var failDeletes = false
+    private let lock = NSLock()
+    private var _stored: [String: String] = [:]
+    private var _failWrites = false
+    private var _failDeletes = false
+    private var _failReads = false
+    private var _readOnMainThread = false
+    private var _reads = 0
+
+    private func locked<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
+    }
+
+    var stored: [String: String] {
+        get { locked { _stored } }
+        set { locked { _stored = newValue } }
+    }
+    /// Make the next writes, deletions or reads fail, as a locked Keychain would.
+    var failWrites: Bool {
+        get { locked { _failWrites } }
+        set { locked { _failWrites = newValue } }
+    }
+    var failDeletes: Bool {
+        get { locked { _failDeletes } }
+        set { locked { _failDeletes = newValue } }
+    }
+    var failReads: Bool {
+        get { locked { _failReads } }
+        set { locked { _failReads = newValue } }
+    }
+    /// Whether a read happened on the main thread.
+    var readOnMainThread: Bool { locked { _readOnMainThread } }
+    /// How many times a password was read.
+    var reads: Int { locked { _reads } }
 
     private func key(_ service: String, _ account: String) -> String { "\(service)|\(account)" }
 
     func password(service: String, account: String) throws -> String? {
-        stored[key(service, account)]
+        try locked {
+            _reads += 1
+            if Thread.isMainThread { _readOnMainThread = true }
+            if _failReads { throw Refused() }
+            return _stored[key(service, account)]
+        }
     }
 
     func setPassword(_ password: String, service: String, account: String) throws {

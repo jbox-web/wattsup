@@ -40,6 +40,8 @@ struct UpsRow: Identifiable {
 
 /// What the menu bar icon says.
 enum MenuLook {
+    /// UPSes are configured but none has answered yet, or the Mac is offline.
+    case waiting
     case allGood, attention, unreachable, empty
 }
 
@@ -58,7 +60,14 @@ final class Model: ObservableObject {
     private let secrets: SecretStore
     private let publish: (String, Snapshot?) -> Void
     private var trackers: [String: Tracker] = [:]
-    private var passwords: [String: String] = [:]
+    /// Where an entry's password lives: `<prefix><name>`. A trial run uses its own prefix,
+    /// so that its entries never touch the passwords of the real configuration.
+    private let keychainPrefix: String
+    /// The password read for each entry, or why it could not be: read once per reload, since
+    /// macOS may ask the user for every read.
+    private var passwordCache: [String: Result<String?, Error>] = [:]
+    /// Moves on at each reload: a read that started before it is not cached.
+    private var cacheGeneration = 0
     private var loops: [String: Task<Void, Never>] = [:]
     /// The poll whose result is still wanted, per UPS; any other result is dropped.
     private var awaited: [String: UUID] = [:]
@@ -70,12 +79,14 @@ final class Model: ObservableObject {
     ///   - publish: shows a UPS in the Batteries widget; nil withdraws it.
     init(
         poller: Poller, configPath: String, networkOnline: @escaping () -> Bool,
-        secrets: SecretStore, publish: @escaping (String, Snapshot?) -> Void
+        secrets: SecretStore, keychainPrefix: String = "jbox.wattsup.",
+        publish: @escaping (String, Snapshot?) -> Void
     ) {
         self.poller = poller
         self.configPath = configPath
         self.networkOnline = networkOnline
         self.secrets = secrets
+        self.keychainPrefix = keychainPrefix
         self.publish = publish
         reload()
     }
@@ -85,7 +96,8 @@ final class Model: ObservableObject {
         switch worst(states: rows.compactMap(\.displayed)) {
         case .lowBattery, .onBattery: return .attention
         case .unreachable, .noData, .refused: return .unreachable
-        case .onMains, nil: return .allGood
+        case .onMains: return .allGood
+        case nil: return .waiting
         }
     }
 
@@ -103,6 +115,8 @@ final class Model: ObservableObject {
 
     /// Reads the configuration again. Entries that did not change keep what is known of them.
     func reload() {
+        passwordCache = [:]
+        cacheGeneration += 1
         var entries: [UpsEntry] = []
         do {
             let config = try loadConfig(path: configPath)
@@ -122,11 +136,6 @@ final class Model: ObservableObject {
             publish(row.entry.name, nil)
         }
         rows = entries.map { kept[$0.name] ?? UpsRow(entry: $0) }
-        passwords = [:]
-        for entry in entries {
-            guard let username = entry.username else { continue }
-            passwords[entry.name] = try? secrets.password(service: keychainService(name: entry.name), account: username)
-        }
         if running {
             // Entries that did not change keep their loop: restarting it would poll again at
             // once, and a few reloads in a row would defeat the three-failures rule.
@@ -140,15 +149,34 @@ final class Model: ObservableObject {
     func pollOnce(_ name: String) async {
         guard let entry = rows.first(where: { $0.entry.name == name })?.entry else { return }
         let poller = self.poller
-        let password = passwords[name]
+        let secrets = self.secrets
+        let service = keychainService(entry.name)
+        let cached = passwordCache[name]
+        let generation = cacheGeneration
         let token = UUID()
         awaited[name] = token
-        // A blocking call: on a thread of its own, not on Swift's cooperative pool, so that a
-        // site that times out never holds back the polls of the others.
-        let snapshot = await withCheckedContinuation { (continuation: CheckedContinuation<Snapshot, Never>) in
+        // Blocking calls, the Keychain (which may ask the user) and the poll: on a thread of
+        // their own, not on the main thread nor Swift's cooperative pool, so that neither the
+        // interface nor the other sites ever wait for them.
+        let (snapshot, read) = await withCheckedContinuation {
+            (continuation: CheckedContinuation<(Snapshot, Result<String?, Error>?), Never>) in
             DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: poller.poll(entry: entry, password: password))
+                var read: Result<String?, Error>?
+                if let username = entry.username, cached == nil {
+                    read = Result { try secrets.password(service: service, account: username) }
+                }
+                switch cached ?? read {
+                case .failure(let error)?:
+                    continuation.resume(returning: (keychainFailure(error), read))
+                case .success(let password)?:
+                    continuation.resume(returning: (poller.poll(entry: entry, password: password), read))
+                case nil:
+                    continuation.resume(returning: (poller.poll(entry: entry, password: nil), read))
+                }
             }
+        }
+        if let read, generation == cacheGeneration {
+            passwordCache[name] = read
         }
         // Stopped, reloaded or overtaken by a newer poll meanwhile: the result is stale.
         guard awaited[name] == token else { return }
@@ -169,8 +197,8 @@ final class Model: ObservableObject {
     /// new name or username when they changed.
     func update(_ old: String, with entry: UpsEntry, password: String?) throws {
         guard let previous = rows.first(where: { $0.entry.name == old })?.entry else { return }
-        let oldKey = previous.username.map { (service: keychainService(name: previous.name), account: $0) }
-        let newKey = entry.username.map { (service: keychainService(name: entry.name), account: $0) }
+        let oldKey = previous.username.map { (service: keychainService(previous.name), account: $0) }
+        let newKey = entry.username.map { (service: keychainService(entry.name), account: $0) }
         let moved = oldKey?.service != newKey?.service || oldKey?.account != newKey?.account
         let kept = try oldKey.flatMap { try secrets.password(service: $0.service, account: $0.account) }
 
@@ -195,7 +223,7 @@ final class Model: ObservableObject {
         try edit { $0.ups.removeAll { $0.name == name } }
         defer { reload() }
         if let username = entry.username {
-            try secrets.delete(service: keychainService(name: name), account: username)
+            try secrets.delete(service: keychainService(name), account: username)
         }
     }
 
@@ -229,7 +257,7 @@ final class Model: ObservableObject {
     @discardableResult
     private func store(_ password: String?, for entry: UpsEntry) throws -> Bool {
         guard let username = entry.username, let password, !password.isEmpty else { return false }
-        try secrets.setPassword(password, service: keychainService(name: entry.name), account: username)
+        try secrets.setPassword(password, service: keychainService(entry.name), account: username)
         return true
     }
 
@@ -256,17 +284,44 @@ final class Model: ObservableObject {
         if !events.isEmpty { onEvents?(entry, events) }
     }
 
+    /// `<prefix><name>`: the service of an entry's password.
+    private func keychainService(_ name: String) -> String {
+        keychainPrefix + name
+    }
+
+    /// One poll, then the time to wait before the next one, in nanoseconds.
+    private func pollAndInterval(_ name: String) async -> UInt64 {
+        await pollOnce(name)
+        return UInt64(pollIntervalSeconds) * 1_000_000_000
+    }
+
     private func startLoop(_ name: String) {
         loops[name]?.cancel()
         loops[name] = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self else { return }
-                await self.pollOnce(name)
-                let interval = UInt64(self.pollIntervalSeconds) * 1_000_000_000
+                // The model is held for the poll only, never across the sleep: a model
+                // nobody uses any more goes away instead of waiting for the loop.
+                guard let interval = await self?.pollAndInterval(name) else { return }
                 try? await Task.sleep(nanoseconds: interval)
             }
         }
     }
+}
+
+/// What a poll that could not read its password reports: refused, as the server would be.
+private func keychainFailure(_ error: Error) -> Snapshot {
+    let reason = (error as? KeychainError)?.reason ?? error.localizedDescription
+    return Snapshot(
+        state: .refused, vars: [:], flags: [], extraFlags: [], chargePercent: nil, runtimeSeconds: nil,
+        loadPercent: nil, loadWatts: nil, model: nil, error: "\(keychainFailurePrefix) (\(reason))")
+}
+
+/// How the error of a poll that could not read its password starts.
+let keychainFailurePrefix = "Keychain: cannot read the password"
+
+/// True when a refusal comes from the Keychain, not from the server.
+func isKeychainFailure(_ snapshot: Snapshot?) -> Bool {
+    snapshot?.error?.hasPrefix(keychainFailurePrefix) ?? false
 }
 
 extension UpsRow {
@@ -283,7 +338,8 @@ func stateLabel(for row: UpsRow) -> String {
     case .onBattery: return tr("on battery")
     case .lowBattery: return tr("low battery")
     case .noData: return tr("no data")
-    case .refused: return tr("refused by the server")
+    case .refused:
+        return isKeychainFailure(row.snapshot) ? tr("password not readable from the Keychain") : tr("refused by the server")
     case .unreachable: return tr("unreachable")
     case nil: return tr("out of reach")
     }

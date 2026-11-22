@@ -13,9 +13,13 @@ protocol SecretStore {
 struct KeychainError: LocalizedError {
     let status: OSStatus
 
+    /// What went wrong, without the "Keychain" prefix.
+    var reason: String {
+        SecCopyErrorMessageString(status, nil) as String? ?? "error \(status)"
+    }
+
     var errorDescription: String? {
-        let reason = SecCopyErrorMessageString(status, nil) as String? ?? "error \(status)"
-        return "Keychain: \(reason)"
+        "Keychain: \(reason)"
     }
 }
 
