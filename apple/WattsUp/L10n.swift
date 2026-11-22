@@ -33,13 +33,16 @@ enum L10n {
     /// `swift run`) they are in the package's resource bundle, under the copied
     /// `Resources` folder. The bundle's own layout (flat, or with a Contents folder)
     /// depends on the SwiftPM version: `Bundle` resolves it, a hand-built path does not.
-    static func url(_ language: String) -> URL? {
-        for (bundle, folder) in [(Bundle.main, "\(language).lproj"), (Bundle.module, "Resources/\(language).lproj")] {
-            if let url = bundle.url(forResource: "Localizable", withExtension: "strings", subdirectory: folder) {
-                return url
-            }
+    ///
+    /// `resources` is a closure, looked at only when the app bundle has no strings: in the
+    /// assembled app there is no SwiftPM resource bundle, and touching `Bundle.module` there
+    /// is a fatal error (it stopped 0.1.1 at launch).
+    static func url(_ language: String, app: Bundle = .main, resources: () -> Bundle = { .module }) -> URL? {
+        let file = "Localizable"
+        if let url = app.url(forResource: file, withExtension: "strings", subdirectory: "\(language).lproj") {
+            return url
         }
-        return nil
+        return resources().url(forResource: file, withExtension: "strings", subdirectory: "Resources/\(language).lproj")
     }
 }
 

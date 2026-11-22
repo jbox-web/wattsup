@@ -80,6 +80,16 @@ sign() {
 sign "$BUNDLE_ID.cli" "$app/Contents/MacOS/$CLI"
 sign "$BUNDLE_ID" "$app"
 codesign --verify --strict "$app"
+# The strings of every language must be in the app itself: without them L10n falls back to
+# SwiftPM's resource bundle, which the app does not have.
+for language in en fr; do
+  [ -f "$app/Contents/Resources/$language.lproj/Localizable.strings" ] || {
+    echo "$language.lproj/Localizable.strings is missing from the app" >&2
+    exit 1
+  }
+done
+# Before anything is sent or published: the app must start.
+apple/launch-check.sh "$app"
 # A slice missing here would make the app refuse to start on that kind of Mac.
 for binary in "$app/Contents/MacOS/$PRODUCT" "$app/Contents/MacOS/$CLI"; do
   for arch in arm64 x86_64; do
