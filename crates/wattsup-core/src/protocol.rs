@@ -40,8 +40,13 @@ pub enum Line {
 pub enum ProtocolError {
     #[error("unterminated quote in server reply")]
     UnterminatedQuote,
+    /// Holds the first word of the reply only: the rest could be anything, a secret included.
     #[error("unexpected server reply: {0}")]
     Unexpected(String),
+    #[error("a server reply line is longer than {0} bytes")]
+    LineTooLong(usize),
+    #[error("a line break or control character in a NUT argument")]
+    InvalidArgument,
 }
 
 /// Parses one reply line, without its line terminator.
@@ -59,8 +64,13 @@ pub fn parse_line(line: &str) -> Result<Line, ProtocolError> {
         ["END", "LIST", ..] => Ok(Line::EndList),
         ["OK", ..] => Ok(Line::Ok),
         ["ERR", code, ..] => Ok(Line::Err(code.to_string())),
-        _ => Err(ProtocolError::Unexpected(line.to_string())),
+        _ => Err(ProtocolError::Unexpected(first_word(line))),
     }
+}
+
+/// The first word of a line, at most 32 characters: enough to say what came back.
+pub(crate) fn first_word(line: &str) -> String {
+    line.split_whitespace().next().unwrap_or("").chars().take(32).collect()
 }
 
 /// Splits a line into elements: words, or quoted strings with `\"` and `\\` unescaped.

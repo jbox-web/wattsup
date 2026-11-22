@@ -190,3 +190,126 @@ fn a_value_that_is_not_utf8_does_not_lose_the_ups() {
     assert_eq!(vars.get("ups.status").map(String::as_str), Some("OL"));
     assert_eq!(vars.get("device.model").map(String::as_str), Some("Caf\u{FFFD}"));
 }
+
+/// A server on a local port that runs `script` for the first connection.
+fn scripted<F>(script: F) -> Endpoint
+where
+    F: FnOnce(std::net::TcpStream) + Send + 'static,
+{
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        if let Ok((stream, _)) = listener.accept() {
+            script(stream);
+        }
+    });
+    Endpoint { host: "127.0.0.1".into(), port }
+}
+
+#[test]
+fn a_server_that_keeps_talking_is_cut_off_by_the_overall_deadline() {
+    use std::io::Write;
+    let endpoint = scripted(|mut stream| {
+        stream.write_all(b"BEGIN LIST VAR ups\n").unwrap();
+        // One line every 100 ms, for ever: each read succeeds, the answer never ends.
+        for i in 0.. {
+            std::thread::sleep(Duration::from_millis(100));
+            if writeln!(stream, "VAR ups x{i} \"1\"").is_err() {
+                return;
+            }
+        }
+    });
+    let started = Instant::now();
+
+    let error = list_vars(&endpoint, "ups", None, Duration::from_millis(300)).unwrap_err();
+
+    assert!(matches!(error, ClientError::Unreachable(_)), "{error:?}");
+    assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+}
+
+#[test]
+fn an_endless_line_is_refused() {
+    use std::io::Write;
+    let endpoint = scripted(|mut stream| {
+        let chunk = [b'a'; 4096];
+        // 1 MiB without a line break, then silence.
+        for _ in 0..256 {
+            if stream.write_all(&chunk).is_err() {
+                return;
+            }
+        }
+        std::thread::sleep(Duration::from_secs(5));
+    });
+
+    let error = list_vars(&endpoint, "ups", None, TIMEOUT).unwrap_err();
+
+    assert!(matches!(error, ClientError::Protocol(_)), "{error:?}");
+}
+
+#[test]
+fn an_unexpected_reply_does_not_echo_the_server_line() {
+    let server = FakeUpsd::start();
+    server.reply("USERNAME monuser", &["OK"]).reply("PASSWORD secret", &[r#"VAR ups leak "hunter2""#]);
+
+    let error = list_vars(&endpoint(&server), "ups", Some(&credentials()), TIMEOUT).unwrap_err();
+
+    assert!(matches!(error, ClientError::Protocol(_)), "{error:?}");
+    assert!(!error.to_string().contains("hunter2"), "{error}");
+}
+
+#[test]
+fn a_garbage_line_is_reported_by_its_first_word_only() {
+    let server = FakeUpsd::start();
+    server.reply("LIST VAR ups", &["BEGIN LIST VAR ups", "NONSENSE with hunter2 inside", "END LIST VAR ups"]);
+
+    let error = list_vars(&endpoint(&server), "ups", None, TIMEOUT).unwrap_err();
+
+    assert!(error.to_string().contains("NONSENSE"), "{error}");
+    assert!(!error.to_string().contains("hunter2"), "{error}");
+}
+
+#[test]
+fn a_line_break_in_an_argument_is_refused_before_anything_is_sent() {
+    let server = FakeUpsd::start();
+    server.vars("ups", &[("ups.status", "OL")]);
+    let sneaky = Credentials { username: "monuser\nLIST UPS".into(), password: "secret".into() };
+
+    let error = list_vars(&endpoint(&server), "ups", Some(&sneaky), TIMEOUT).unwrap_err();
+    assert!(matches!(error, ClientError::Protocol(_)), "{error:?}");
+    let error = list_vars(&endpoint(&server), "ups\rLIST UPS", None, TIMEOUT).unwrap_err();
+    assert!(matches!(error, ClientError::Protocol(_)), "{error:?}");
+
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(server.received().is_empty(), "{:?}", server.received());
+}
+
+#[test]
+fn a_server_that_drips_bytes_without_a_line_break_is_cut_off_by_the_overall_deadline() {
+    use std::io::Write;
+    let endpoint = scripted(|mut stream| {
+        // One byte every 100 ms, never a line break: each socket read succeeds.
+        loop {
+            std::thread::sleep(Duration::from_millis(100));
+            if stream.write_all(b"a").is_err() {
+                return;
+            }
+        }
+    });
+    let started = Instant::now();
+
+    let error = list_vars(&endpoint, "ups", None, Duration::from_millis(300)).unwrap_err();
+
+    assert!(matches!(error, ClientError::Unreachable(_)), "{error:?}");
+    assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+}
+
+#[test]
+fn a_long_error_code_is_cut_short() {
+    let long = "X".repeat(1000);
+    let server = FakeUpsd::start();
+    server.reply("LIST VAR ups", &[&format!("ERR {long}")]);
+
+    let error = list_vars(&endpoint(&server), "ups", None, TIMEOUT).unwrap_err();
+
+    assert!(error.to_string().len() < 100, "{} bytes", error.to_string().len());
+}
