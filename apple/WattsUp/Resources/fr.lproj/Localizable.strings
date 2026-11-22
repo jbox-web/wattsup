@@ -93,3 +93,6 @@
 "Open System Settings…" = "Ouvrir les Réglages Système…";
 "password not readable from the Keychain" = "mot de passe illisible dans le Trousseau";
 "The password cannot be read from the Keychain" = "Le mot de passe est illisible dans le Trousseau";
+"Check for Updates…" = "Rechercher les mises à jour…";
+"Check for updates automatically" = "Rechercher les mises à jour automatiquement";
+"Updates by Sparkle, under the MIT license" = "Mises à jour par Sparkle, sous licence MIT";

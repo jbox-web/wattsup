@@ -86,6 +86,11 @@ private struct AboutView: View {
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Link("MIT License", destination: URL(string: "https://opensource.org/license/mit")!)
                 .font(.callout)
+            // Shipped by apple/package.sh next to Sparkle.framework, as its license asks.
+            if let sparkle = Bundle.main.url(forResource: "Sparkle-LICENSE", withExtension: "txt") {
+                Link("Updates by Sparkle, under the MIT license", destination: sparkle)
+                    .font(.callout)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -97,6 +102,7 @@ private struct GeneralSettings: View {
     @ObservedObject var notifier: Notifier
     @AppStorage(Preferences.notificationsKey) private var notifications = true
     @SwiftUI.State private var openAtLogin = SMAppService.mainApp.status == .enabled
+    @SwiftUI.State private var checksForUpdates = Updates.shared.checksAutomatically
     @SwiftUI.State private var interval = 30
     @SwiftUI.State private var error: String?
 
@@ -121,6 +127,10 @@ private struct GeneralSettings: View {
                 }
                 Toggle("Open at login", isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { _, enabled in setOpenAtLogin(enabled) }
+                if Updates.shared.available {
+                    Toggle("Check for updates automatically", isOn: $checksForUpdates)
+                        .onChange(of: checksForUpdates) { _, enabled in Updates.shared.checksAutomatically = enabled }
+                }
             }
             if let error {
                 Section {

@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notifier: Notifier!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Before the menu, which shows "Check for Updates…" only when Sparkle runs.
+        Updates.shared.start()
         let network = self.network
         let publisher = self.publisher
         model = Model(

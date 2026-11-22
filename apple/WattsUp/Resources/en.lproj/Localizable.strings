@@ -93,3 +93,6 @@
 "Open System Settings…" = "Open System Settings…";
 "password not readable from the Keychain" = "password not readable from the Keychain";
 "The password cannot be read from the Keychain" = "The password cannot be read from the Keychain";
+"Check for Updates…" = "Check for Updates…";
+"Check for updates automatically" = "Check for updates automatically";
+"Updates by Sparkle, under the MIT license" = "Updates by Sparkle, under the MIT license";

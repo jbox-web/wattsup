@@ -1,0 +1,14 @@
+#!/bin/sh
+# Links the CLI where shells find it, then opens the app in the user's session. Neither
+# step fails the installation: the app is in place either way.
+app="${3%/}/Applications/Watt's Up.app"
+
+# -n: replace a link, never write through one.
+{ mkdir -p /usr/local/bin && ln -sfn "$app/Contents/MacOS/wattsup" /usr/local/bin/wattsup; } ||
+  echo "the wattsup command could not be linked into /usr/local/bin" >&2
+
+user=$(stat -f%Su /dev/console)
+if [ -n "$user" ] && [ "$user" != root ] && [ "$user" != loginwindow ]; then
+  launchctl asuser "$(id -u "$user")" sudo -u "$user" open "$app" || true
+fi
+exit 0

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Quits the app of the user installing: a menu bar app swapped under itself keeps running
+# the old binary. postinstall opens it again for that user; other sessions keep theirs.
+user=$(stat -f%Su /dev/console)
+if [ -n "$user" ] && [ "$user" != root ] && [ "$user" != loginwindow ]; then
+  pkill -x -u "$user" "Watt's Up" 2>/dev/null || true
+fi
+exit 0

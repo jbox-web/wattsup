@@ -36,14 +36,14 @@ run = "swift test --package-path apple"
 timeout = "900s"
 
 [tasks."dev:package"]
-description = "Build apple/dist/Watt's Up.app and its archive; signs and notarizes when apple/signing.env says so"
+description = "Build apple/dist/Watt's Up.app and its installer .pkg; signs and notarizes when apple/signing.env says so"
 run = "apple/package.sh"
 # Two hours: the build takes minutes, but Apple's notary service has been seen taking more
 # than twenty minutes on a first submission, and a timeout here leaves the app unstapled.
 timeout = "7200s"
 
 [tasks."dev:release"]
-description = "Publish the version of Cargo.toml: signed tag, GitHub Release, cask in jbox-web/homebrew-tap"
+description = "Publish the version of Cargo.toml: signed tag, GitHub Release with the .pkg and its Sparkle appcast (NOTES=file for release notes)"
 run = "apple/release.sh"
 # Includes a notarized build: same budget as dev:package.
 timeout = "7200s"

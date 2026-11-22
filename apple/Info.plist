@@ -31,5 +31,18 @@
     <!-- Menu bar only: no Dock icon, no main menu. -->
     <key>LSUIElement</key>
     <true/>
+    <!-- Sparkle: the appcast.xml of the latest GitHub Release, checked once a day. Updates
+         are signed with the private key of account "wattsup" in the login Keychain (Sparkle's
+         generate_keys and sign_update); an update is installed only once the user accepts. -->
+    <key>SUFeedURL</key>
+    <string>@FEED_URL@</string>
+    <key>SUPublicEDKey</key>
+    <string>6NfZ67AC5uEfDp3/GJX5E/FvZT2OHQxFAHQxJxDkBcU=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
 </dict>
 </plist>

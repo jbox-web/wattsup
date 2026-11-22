@@ -6,6 +6,10 @@ import PackageDescription
 let package = Package(
     name: "WattsUp",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // Updates from the GitHub Releases (appcast.xml, EdDSA-signed .pkg).
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+    ],
     targets: [
         .binaryTarget(name: "WattsUpCoreFFI", path: "Generated/WattsUpCoreFFI.xcframework"),
         .target(
@@ -17,10 +21,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "WattsUp",
-            dependencies: ["WattsUpCore"],
+            dependencies: ["WattsUpCore", .product(name: "Sparkle", package: "Sparkle")],
             path: "WattsUp",
             resources: [.copy("Resources")],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // Sparkle.framework is copied into Contents/Frameworks.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         .executableTarget(name: "Smoke", dependencies: ["WattsUpCore"], path: "Smoke"),
         .testTarget(

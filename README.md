@@ -14,14 +14,18 @@ macOS already shows those.
 
 ## Install
 
-```sh
-brew install --cask jbox-web/tap/wattsup
-```
+Download `WattsUp-<version>.pkg` from the
+[Releases](https://github.com/jbox-web/wattsup/releases) and open it. It installs
+`Watt's Up.app` in `/Applications` and links the `wattsup` command into `/usr/local/bin`.
+The app is universal (Apple Silicon and Intel), needs macOS 14 or later, and is signed and
+notarized by Apple.
 
-Or download `WattsUp-<version>.zip` from the
-[Releases](https://github.com/jbox-web/wattsup/releases), unzip it and move
-`Watt's Up.app` to `/Applications`. The app is universal (Apple Silicon and Intel),
-needs macOS 14 or later, and is signed and notarized by Apple.
+After that the app updates itself: it checks the latest Release once a day and offers a new
+version, installed only once you accept (your administrator password is asked). The menu
+has "Check for Updates…", and Settings can turn the daily check off.
+
+Installed with Homebrew before 0.2.0? The cask is gone: run
+`brew uninstall --cask wattsup`, then install the package.
 
 ## Build from source
 
@@ -36,25 +40,37 @@ open "/Applications/Watt's Up.app"
 
 Without settings the app is signed ad hoc, which is enough to run it on the Mac that
 built it. To distribute it, sign it with a Developer ID certificate and have Apple
-notarize it: put the two settings in `apple/signing.env` (kept out of git), and
+notarize it: put the three settings in `apple/signing.env` (kept out of git), and
 `dev:package` does the rest.
 
 ```sh
 SIGN_ID="Developer ID Application: <team name>"
+# Signs the .pkg: Apple notarizes no package without it.
+INSTALLER_ID="Developer ID Installer: <team name>"
 NOTARY_PROFILE=wattsup     # made once by: xcrun notarytool store-credentials wattsup --apple-id <id> --team-id <team>
 ```
 
 The app and the CLI are universal (Apple Silicon and Intel), for macOS 14 or later.
-The app is then signed with the Hardened Runtime and a secure timestamp, sent to Apple,
-and the ticket is stapled to it. `apple/dist/WattsUp-<version>.zip` is the archive to
-publish. Apple's answer can take more than twenty minutes. A stable identity also keeps
-the notification permission, the login item and Keychain access from one build to the
-next; an ad hoc one changes with every build.
+The app is then signed with the Hardened Runtime and a secure timestamp and put in the
+installer `apple/dist/WattsUp-<version>.pkg`; the package is signed, sent to Apple, and the
+ticket is stapled to it. Apple's answer can take more than twenty minutes. A stable
+identity also keeps the notification permission, the login item and Keychain access from
+one build to the next; an ad hoc one changes with every build. Without `INSTALLER_ID` the
+package is left unsigned, which is enough to try it on the Mac that built it.
 
 `mise run dev:release` publishes the version of `Cargo.toml`: it builds, signs and
-notarizes the app, pushes a signed tag, creates the GitHub Release with the archive, and
-writes the `wattsup` cask into [jbox-web/homebrew-tap](https://github.com/jbox-web/homebrew-tap).
-The commit must be pushed first. `apple/release.sh --cask` redoes the last step alone.
+notarizes the package, signs it for Sparkle, pushes a signed tag, and creates the GitHub
+Release with the package and its `appcast.xml`, the feed the installed apps read. Release
+notes in Markdown go in a file: `NOTES=notes.md mise run dev:release`; they show on the
+Release and in the app's update window. The commit must be pushed first.
+
+Updates are signed with an EdDSA key whose private half lives in the login Keychain
+(account `wattsup`) and whose public half is `SUPublicEDKey` in `apple/Info.plist`. It was
+made once by Sparkle's `generate_keys --account wattsup` (in
+`apple/.build/artifacts/sparkle/Sparkle/bin/` once the package is resolved). Lose it and the
+installed apps refuse every later update: export it (`generate_keys --account wattsup -x
+<file>`) and keep it somewhere safe. `dev:release` checks the two halves match before
+building.
 
 Other tasks: `dev:test` and `dev:swift-test` (tests), `dev:lint`, `dev:fmt-check`,
 `dev:bindings` (Rust library and Swift bindings only).
@@ -134,7 +150,8 @@ passwords then go under `jbox.wattsup-trial.<name>`, apart from the real ones.
 
 ## Command line
 
-The app bundle contains the CLI: `/Applications/Watt's Up.app/Contents/MacOS/wattsup`.
+The app bundle contains the CLI, `/Applications/Watt's Up.app/Contents/MacOS/wattsup`; the
+package links it as `/usr/local/bin/wattsup`.
 
 ```console
 $ wattsup status

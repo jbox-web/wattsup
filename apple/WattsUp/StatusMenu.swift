@@ -80,6 +80,9 @@ final class StatusMenu: NSObject {
         menu.addItem(action(tr("Manage UPSes…"), #selector(showUpses), key: ",", symbol: "list.bullet"))
         menu.addItem(action(tr("Settings…"), #selector(showSettings), symbol: "gearshape"))
         menu.addItem(action(tr("About Watt's Up"), #selector(showAbout), symbol: "info.circle"))
+        if Updates.shared.available {
+            menu.addItem(action(tr("Check for Updates…"), #selector(checkForUpdates), symbol: "arrow.down.circle"))
+        }
         menu.addItem(.separator())
         menu.addItem(action(tr("Quit Watt's Up"), #selector(quit), key: "q", symbol: "power"))
         item.menu = menu
@@ -127,6 +130,8 @@ final class StatusMenu: NSObject {
     @objc private func showSettings() { openSettings(.general) }
 
     @objc private func showAbout() { openSettings(.about) }
+
+    @objc private func checkForUpdates() { Updates.shared.checkNow() }
 
     @objc private func quit() { NSApp.terminate(nil) }
 }

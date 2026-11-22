@@ -9,7 +9,7 @@ app=$1
 executable="$app/Contents/MacOS/$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")"
 probe=$(mktemp -d)
 trap 'rm -rf "$probe"' EXIT
-WATTSUP_CONFIG="$probe/config.toml" "$executable" > "$probe/output.log" 2>&1 &
+WATTSUP_CONFIG="$probe/config.toml" WATTSUP_NO_UPDATES=1 "$executable" > "$probe/output.log" 2>&1 &
 pid=$!
 sleep 5
 # A Swift fatal error does not end the process at once: it stays alive for many seconds
