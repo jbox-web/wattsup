@@ -30,13 +30,16 @@ enum L10n {
     }
 
     /// In the assembled app the files sit in Contents/Resources; under SwiftPM (tests,
-    /// `swift run`) they are in the package's resource bundle.
-    private static func url(_ language: String) -> URL? {
-        let file = "\(language).lproj/Localizable.strings"
-        if let inApp = Bundle.main.resourceURL?.appendingPathComponent(file), FileManager.default.fileExists(atPath: inApp.path) {
-            return inApp
+    /// `swift run`) they are in the package's resource bundle, under the copied
+    /// `Resources` folder. The bundle's own layout (flat, or with a Contents folder)
+    /// depends on the SwiftPM version: `Bundle` resolves it, a hand-built path does not.
+    static func url(_ language: String) -> URL? {
+        for (bundle, folder) in [(Bundle.main, "\(language).lproj"), (Bundle.module, "Resources/\(language).lproj")] {
+            if let url = bundle.url(forResource: "Localizable", withExtension: "strings", subdirectory: folder) {
+                return url
+            }
         }
-        return Bundle.module.resourceURL?.appendingPathComponent("Resources").appendingPathComponent(file)
+        return nil
     }
 }
 

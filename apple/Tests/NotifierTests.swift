@@ -59,9 +59,16 @@ final class NotifierTests: XCTestCase {
         }
     }
 
+    /// What the resource bundle holds, for a failure message that says where the files are.
+    private var bundleContents: String {
+        let root = Bundle.module.bundleURL
+        let files = FileManager.default.enumerator(atPath: root.path)?.allObjects as? [String] ?? []
+        return "\(root.path): \(files.sorted().joined(separator: ", "))"
+    }
+
     func testBothLanguagesHaveTheSameKeys() throws {
-        let english = try XCTUnwrap(L10n.table("en"))
-        let french = try XCTUnwrap(L10n.table("fr"))
+        let english = try XCTUnwrap(L10n.table("en"), bundleContents)
+        let french = try XCTUnwrap(L10n.table("fr"), bundleContents)
         XCTAssertFalse(english.isEmpty)
         XCTAssertEqual(Set(english.keys).symmetricDifference(french.keys).sorted(), [])
     }
